@@ -157,8 +157,8 @@ function MsgRow({ msg }: { msg: Message }) {
 interface Props { partnerId: string | null }
 
 export default function ChatReport({ partnerId }: Props) {
-  const [open, setOpen]           = useState(false);
-  const [view, setView]           = useState<ViewMode>("messages");
+  const [open, setOpen]           = useState(true);
+  const [view, setView]           = useState<ViewMode>("clients");
 
   // messages tab
   const [msgs, setMsgs]           = useState<Message[]>([]);
