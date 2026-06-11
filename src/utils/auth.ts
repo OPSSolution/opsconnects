@@ -3,6 +3,7 @@ import { supabase } from "./supabase/client";
 export interface Session {
   role: "partner" | "admin";
   partnerId: string;
+  partnerDbId?: string;   // UUID — used for messages table queries
   partnerName: string;
   email: string;
 }
@@ -54,7 +55,7 @@ export async function getSession(): Promise<Session | null> {
   // Look up partner record using user_id
   const { data: partner } = await supabase
     .from("partners")
-    .select("partner_id, partner_name, email")
+    .select("id, partner_id, partner_name, email")
     .eq("user_id", session.user.id)
     .single();
 
@@ -63,6 +64,7 @@ export async function getSession(): Promise<Session | null> {
   const s: Session = {
     role: "partner",
     partnerId: partner.partner_id,
+    partnerDbId: partner.id,
     partnerName: partner.partner_name,
     email: partner.email ?? session.user.email ?? "",
   };

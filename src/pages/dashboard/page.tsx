@@ -38,6 +38,7 @@ export default function Dashboard() {
   const [activeAnalyticsChannel, setActiveAnalyticsChannel] = useState<string | null>(null);
   const [partnerName, setPartnerName] = useState<string | null>(null);
   const [partnerIdState, setPartnerIdState] = useState<string | null>(null);
+  const [partnerDbId, setPartnerDbId] = useState<string | null>(null);
   const [replyTarget, setReplyTarget] = useState<SimMessage | null>(null);
   const [replyText, setReplyText] = useState("");
   const [reportOpen, setReportOpen] = useState(false);
@@ -55,6 +56,7 @@ export default function Dashboard() {
       if (session?.role === "partner" && session.partnerId) {
         setPartnerName(session.partnerName || null);
         setPartnerIdState(session.partnerId);
+        setPartnerDbId(session.partnerDbId || null);
         const name = session.partnerName || "";
         if (name) {
           setWidgetName(name);
@@ -710,7 +712,7 @@ ${date.toISOString().split("T")[0]}
                   </div>
                 )}
                 {/* Chat Report */}
-                <ChatReport partnerId={partnerIdState} />
+                <ChatReport partnerId={partnerDbId} />
 
                 {/* Website Widget Generator */}
                 {connectedArray.length > 0 && (
