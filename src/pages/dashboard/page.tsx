@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import Navbar from "@/components/feature/Navbar";
 import Footer from "@/components/feature/Footer";
 import { partnerChannels } from "@/mocks/partners";
-import { dashboardStats, channelMetrics, recentActivity, analyticsTrends, customerNames, messagePreviews, monthlyReportData } from "@/mocks/dashboard";
+import { dashboardStats, channelMetrics, recentActivity, analyticsTrends, monthlyReportData } from "@/mocks/dashboard";
 import { getSession, getPartnerChannels } from "@/utils/auth";
 import { supabase } from "@/utils/supabase/client";
 import ChatReport from "./components/ChatReport";
@@ -12,7 +12,6 @@ import LiveChat from "./components/LiveChat";
 
 type TestState = "idle" | "testing" | "success" | "error";
 type BulkTestEntry = { channelId: string; status: TestState };
-type SimMessage = { id: number; channelId: string; customer: string; message: string; timestamp: string };
 
 const channelIcons: Record<string, string> = {
   whatsapp: "ri-whatsapp-line", telegram: "ri-telegram-line", messenger: "ri-messenger-line",
@@ -25,25 +24,17 @@ const channelColors: Record<string, string> = {
   livechat: "#FF6B35", wechat: "#07C160",
 };
 
-function randomItem<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
-
 export default function Dashboard() {
   const [configuredChannels, setConfiguredChannels] = useState<Set<string>>(new Set());
   const [testStates, setTestStates] = useState<Record<string, TestState>>({});
   const [bulkTest, setBulkTest] = useState<{ running: boolean; entries: BulkTestEntry[] }>({ running: false, entries: [] });
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [disconnectModal, setDisconnectModal] = useState<string | null>(null);
-  const [liveMessages, setLiveMessages] = useState<SimMessage[]>([]);
-  const [simRunning, setSimRunning] = useState(false);
-  const simMsgIdRef = useRef(0);
-  const simIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [activeAnalyticsChannel, setActiveAnalyticsChannel] = useState<string | null>(null);
   const [partnerName, setPartnerName] = useState<string | null>(null);
   const [partnerIdState, setPartnerIdState] = useState<string | null>(null);
   const [partnerDbId, setPartnerDbId] = useState<string | null>(null);
-  const [replyTarget, setReplyTarget] = useState<SimMessage | null>(null);
-  const [replyText, setReplyText] = useState("");
   const [reportOpen, setReportOpen] = useState(false);
   const [reportModal, setReportModal] = useState<{ channelId: string; report: string } | null>(null);
   const [widgetOpen, setWidgetOpen] = useState(false);
@@ -213,59 +204,6 @@ export default function Dashboard() {
     };
     runSequential();
   }, [configuredChannels]);
-
-  const toggleSimulation = () => {
-    if (simRunning) {
-      if (simIntervalRef.current) clearInterval(simIntervalRef.current);
-      setSimRunning(false);
-      showToast("Live simulation stopped.");
-      return;
-    }
-    const connected = partnerChannels.filter((ch) => configuredChannels.has(ch.id));
-    if (connected.length === 0) { showToast("Connect at least one channel first."); return; }
-    setSimRunning(true);
-    showToast("Live message simulation started!");
-    simIntervalRef.current = setInterval(() => {
-      const channel = randomItem(connected);
-      simMsgIdRef.current += 1;
-      const newMsg: SimMessage = {
-        id: simMsgIdRef.current,
-        channelId: channel.id,
-        customer: randomItem(customerNames),
-        message: randomItem(messagePreviews),
-        timestamp: "Just now",
-      };
-      setLiveMessages((prev) => {
-        const updated = [newMsg, ...prev];
-        if (updated.length > 50) updated.length = 50;
-        updated.forEach((m, idx) => { if (idx > 0) { const secs = (idx * 2) + Math.floor(Math.random() * 10); m.timestamp = `${secs}s ago`; } });
-        return updated.map((m, idx) => idx === 0 ? { ...m, timestamp: "Just now" } : m);
-      });
-    }, 2500 + Math.random() * 1500);
-  };
-
-  useEffect(() => { return () => { if (simIntervalRef.current) clearInterval(simIntervalRef.current); }; }, []);
-
-  const handleReplySend = () => {
-    if (!replyTarget || !replyText.trim()) return;
-    const replyMsg: SimMessage = {
-      id: simMsgIdRef.current + 10000,
-      channelId: replyTarget.channelId,
-      customer: "You replied",
-      message: replyText.trim(),
-      timestamp: "Just now",
-    };
-    simMsgIdRef.current += 1;
-    setLiveMessages((prev) => {
-      const updated = [replyMsg, ...prev];
-      if (updated.length > 50) updated.length = 50;
-      return updated;
-    });
-    setReplyText("");
-    setReplyTarget(null);
-    const channel = partnerChannels.find((c) => c.id === replyTarget.channelId);
-    showToast(`Reply sent via ${channel?.name || replyTarget.channelId}!`);
-  };
 
   const generateReport = (channelId: string): string => {
     const data = monthlyReportData[channelId];
@@ -746,9 +684,6 @@ ${date.toISOString().split("T")[0]}
                     )}
                   </div>
                 )}
-                {/* Live Chat — real-time agent replies to widget visitors */}
-                <LiveChat partnerId={partnerIdState} />
-
                 {/* Support Requests — from the embedded chat widget */}
                 <SupportRequests partnerId={partnerIdState} />
 
@@ -1033,117 +968,10 @@ ${date.toISOString().split("T")[0]}
                 )}
               </div>
 
-              {/* Right sidebar: Live Simulation + Recent Activity */}
+              {/* Right sidebar: Live Chat + Recent Activity */}
               <div className="space-y-5">
-                {/* Live Message Simulation */}
-                <div className="bg-background-100 rounded-xl border border-background-200/70 p-5">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="font-heading text-sm font-bold text-foreground-950">Live Incoming Messages</h2>
-                    <button
-                      onClick={toggleSimulation}
-                      className={`text-xs font-semibold whitespace-nowrap cursor-pointer px-3 py-1.5 rounded-md transition-colors ${
-                        simRunning
-                          ? "bg-red-50 text-red-500 hover:bg-red-100"
-                          : "bg-accent-100 text-accent-600 hover:bg-accent-200"
-                      }`}
-                    >
-                      {simRunning ? (
-                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"/> Stop</span>
-                      ) : (
-                        <span className="flex items-center gap-1"><i className="ri-play-circle-line"></i> Simulate</span>
-                      )}
-                    </button>
-                  </div>
-
-                  {liveMessages.length === 0 ? (
-                    <div className="text-center py-8">
-                      <div className="w-10 h-10 mx-auto flex items-center justify-center rounded-full bg-background-200/80 mb-3">
-                        <i className="ri-message-3-line text-lg text-foreground-400"></i>
-                      </div>
-                      <p className="text-xs text-foreground-500">No live messages yet</p>
-                      <p className="text-[11px] text-foreground-400 mt-1">Click "Simulate" to see messages flowing in real-time</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-1 max-h-[380px] overflow-y-auto pr-1">
-                      {liveMessages.map((msg) => {
-                        const isReply = msg.customer === "You replied";
-                        const isSelected = replyTarget?.id === msg.id;
-                        return (
-                          <div
-                            key={msg.id}
-                            onClick={() => !isReply && setReplyTarget(isSelected ? null : msg)}
-                            className={`flex gap-3 items-start p-2.5 rounded-lg transition-colors animate-[fadeInUp_0.3s_ease-out] ${
-                              isReply
-                                ? "bg-primary-50 border border-primary-200/40"
-                                : isSelected
-                                  ? "bg-accent-100 border border-accent-300/50"
-                                  : "hover:bg-background-50 cursor-pointer"
-                            }`}
-                          >
-                            <div className="w-8 h-8 flex items-center justify-center rounded-full flex-shrink-0 mt-0.5" style={{ backgroundColor: (channelColors[msg.channelId] || "#999") + "20" }}>
-                              {isReply ? (
-                                <i className="ri-reply-line text-xs" style={{ color: channelColors[msg.channelId] || "#999" }}></i>
-                              ) : (
-                                <i className={`${channelIcons[msg.channelId] || "ri-question-line"} text-xs`} style={{ color: channelColors[msg.channelId] || "#999" }}></i>
-                              )}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center justify-between gap-2">
-                                <p className={`text-xs font-semibold truncate ${isReply ? "text-primary-600" : "text-foreground-800"}`}>{msg.customer}</p>
-                                <span className="text-[10px] text-foreground-300 flex-shrink-0">{msg.timestamp}</span>
-                              </div>
-                              <p className="text-xs text-foreground-500 truncate mt-0.5">{msg.message}</p>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Reply Panel */}
-                  {replyTarget && (
-                    <div className="mt-3 bg-background-50 rounded-lg border border-primary-200/60 p-3 animate-[fadeInUp_0.25s_ease-out]">
-                      <div className="flex items-center gap-2 mb-2">
-                        <i className="ri-reply-line text-xs text-primary-500"></i>
-                        <p className="text-[11px] font-medium text-foreground-600">
-                          Replying to <span className="text-foreground-800">{replyTarget.customer}</span> via <span className="text-foreground-800">{partnerChannels.find((c) => c.id === replyTarget.channelId)?.name}</span>
-                        </p>
-                        <button onClick={() => { setReplyTarget(null); setReplyText(""); }} className="ml-auto text-[10px] text-foreground-400 hover:text-foreground-600 transition-colors cursor-pointer">
-                          <i className="ri-close-line"></i>
-                        </button>
-                      </div>
-                      <p className="text-xs text-foreground-400 bg-background-100 rounded px-2.5 py-1.5 mb-2.5 italic">"{replyTarget.message}"</p>
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={replyText}
-                          onChange={(e) => setReplyText(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === "Enter") handleReplySend(); }}
-                          placeholder="Type your reply..."
-                          className="flex-1 bg-background-100 border border-background-200/70 rounded-md px-3 py-2 text-sm text-foreground-800 outline-none focus:border-primary-400 placeholder:text-foreground-300"
-                          autoFocus
-                        />
-                        <button
-                          onClick={handleReplySend}
-                          disabled={!replyText.trim()}
-                          className={`text-xs font-semibold whitespace-nowrap cursor-pointer px-4 py-2 rounded-md transition-colors ${
-                            replyText.trim()
-                              ? "bg-primary-500 text-background-50 dark:text-foreground-950 hover:bg-primary-600"
-                              : "bg-background-200 text-foreground-300 cursor-not-allowed"
-                          }`}
-                        >
-                          Send
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {liveMessages.length > 0 && (
-                    <button onClick={() => setLiveMessages([])} className="mt-3 w-full text-xs font-medium text-foreground-400 hover:text-foreground-600 transition-colors whitespace-nowrap cursor-pointer py-1.5">
-                      Clear Messages
-                    </button>
-                  )}
-                </div>
+                {/* Live Chat — real-time agent replies to widget visitors */}
+                <LiveChat partnerId={partnerIdState} />
 
                 {/* Recent Activity */}
                 <div className="bg-background-100 rounded-xl border border-background-200/70 p-5">
