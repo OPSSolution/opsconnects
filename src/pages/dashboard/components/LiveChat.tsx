@@ -95,7 +95,8 @@ export default function LiveChat({ partnerId }: Props) {
       .order("created_at", { ascending: true })
       .then(({ data }) => { if (data) setMessages(data as ChatMessage[]); });
 
-    supabase.from("live_chats").update({ status: "active" }).eq("id", activeChat.id);
+    supabase.from("live_chats").update({ status: "active" }).eq("id", activeChat.id)
+      .then(({ error }) => { if (error) console.error("[LiveChat] status update failed:", error.message); });
 
     const ch = supabase
       .channel(`msgs_${activeChat.id}`)
