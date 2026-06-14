@@ -145,20 +145,33 @@
   var snd    = document.getElementById('_ocw_snd');
   var isOpen = false;
 
-  // 'chat'            → AI is answering questions
-  // 'collect_name'    → AI triggered escalation; collecting visitor name
-  // 'collect_contact' → collecting visitor contact (email/phone)
-  var step         = 'chat';
-  var chatHistory  = [];   // [{role, content}] sent to /ai-chat for context
-  var lastQuestion = '';   // the visitor's last message before escalation was triggered
-  var visitorName  = '';
+  // 'chat'            → AI answering questions
+  // 'collect_name'    → AI escalated; collecting visitor name
+  // 'collect_contact' → collecting visitor contact
+  // 'live'            → connected to human agent
+  var step           = 'chat';
+  var chatHistory    = [];    // [{role,content}] for /ai-chat context
+  var lastQuestion   = '';    // last visitor question before escalation
+  var visitorName    = '';
   var visitorContact = '';
+  var liveChatId     = null;  // UUID of the live_chats session
+  var pollSince      = null;  // ISO timestamp of last successful agent message poll
+  var pollTimer      = null;  // setInterval handle
 
-  function addMsg(text, isUser) {
+  function addMsg(text, isUser, label) {
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex;flex-direction:column;align-items:' + (isUser ? 'flex-end' : 'flex-start') + ';margin-bottom:2px';
+    if (label) {
+      var lbl = document.createElement('span');
+      lbl.style.cssText = 'font-size:10px;color:#9ca3af;margin-bottom:2px;padding:0 4px';
+      lbl.textContent = label;
+      wrap.appendChild(lbl);
+    }
     var d = document.createElement('div');
     d.className = isUser ? '_ocw_usr' : '_ocw_bot';
     d.textContent = text;
-    msgs.appendChild(d);
+    wrap.appendChild(d);
+    msgs.appendChild(wrap);
     msgs.scrollTop = msgs.scrollHeight;
   }
 
@@ -171,37 +184,84 @@
     return t;
   }
 
-  function removeDots(el) {
-    if (el && el.parentNode) el.parentNode.removeChild(el);
-  }
+  function removeDots(el) { if (el && el.parentNode) el.parentNode.removeChild(el); }
 
-  // Show typing dots for a fixed delay then call cb
   function botDelay(text, cb) {
     var t = showDots();
     setTimeout(function () { removeDots(t); if (text) addMsg(text, false); if (cb) cb(); inp.focus(); }, 750);
   }
 
+  function startPolling() {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(function () {
+      if (!liveChatId || !cfg.api) return;
+      var url = cfg.api + '/live-chat?action=poll&chat_id=' + liveChatId;
+      if (pollSince) url += '&since=' + encodeURIComponent(pollSince);
+      fetch(url)
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (!data.messages || !data.messages.length) return;
+          data.messages.forEach(function (msg) {
+            addMsg(msg.content, false, (msg.sender_name || 'Agent') + ' · Support Team');
+          });
+          pollSince = data.messages[data.messages.length - 1].created_at;
+        })
+        .catch(function () {});
+    }, 3000);
+  }
+
+  function stopPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
+
+  function startLiveChat() {
+    fetch(cfg.api + '/live-chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action:          'start',
+        partner_id:      cfg.partnerId,
+        visitor_name:    visitorName,
+        visitor_contact: visitorContact,
+        initial_message: lastQuestion,
+        ai_history:      chatHistory.slice(-20),
+      })
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (!data.chat_id) throw new Error('no chat_id');
+      liveChatId = data.chat_id;
+      pollSince  = new Date().toISOString();
+      step       = 'live';
+      botDelay(
+        '✅ You\'re now connected to a support agent! Someone from ' + cfg.name + ' will reply here shortly. Feel free to add more details.',
+        function () {
+          inp.disabled = false;
+          snd.disabled = false;
+          inp.placeholder = 'Message the support team…';
+          startPolling();
+        }
+      );
+    })
+    .catch(function () {
+      botDelay('Sorry, we couldn\'t connect you to an agent right now. Please try again.', function () {
+        step = 'collect_contact';
+        inp.disabled = false;
+        snd.disabled = false;
+      });
+    });
+  }
+
   function toggle() {
     isOpen = !isOpen;
     panel.classList.toggle('open', isOpen);
-    if (isOpen && chatHistory.length === 0) {
+    if (isOpen && chatHistory.length === 0 && step === 'chat') {
       botDelay('Hi there! 👋 I\'m ' + cfg.name + '\'s AI assistant. How can I help you today?');
     }
-    if (isOpen) inp.focus();
-  }
-
-  function afterContactSubmit(ok) {
-    botDelay(
-      ok
-        ? 'Got it! Our team will follow up with you at ' + visitorContact + '. Feel free to keep chatting if you have more questions!'
-        : 'Sorry, something went wrong. Please try again.',
-      function () {
-        if (ok) { step = 'chat'; }          // allow continued chatting after escalation
-        else    { step = 'collect_contact'; } // retry
-        inp.disabled = false;
-        snd.disabled = false;
-      }
-    );
+    if (isOpen) {
+      inp.focus();
+      if (step === 'live' && liveChatId && !pollTimer) startPolling();
+    } else {
+      stopPolling(); // pause while panel is closed to save resources
+    }
   }
 
   function send() {
@@ -210,7 +270,7 @@
     addMsg(txt, true);
     inp.value = '';
 
-    // ── Collecting name after AI escalation ──────────────────────────────────
+    // ── Collecting visitor name ───────────────────────────────────────────────
     if (step === 'collect_name') {
       visitorName = txt;
       step = 'collect_contact';
@@ -218,31 +278,43 @@
       return;
     }
 
-    // ── Collecting contact, then saving to support_requests ──────────────────
+    // ── Collecting contact → start live chat session ──────────────────────────
     if (step === 'collect_contact') {
       visitorContact = txt;
       inp.disabled = true;
       snd.disabled = true;
       if (cfg.api) {
-        fetch(cfg.api + '/chat-support', {
+        startLiveChat();
+      } else {
+        botDelay('Your details have been received. Our team will contact you at ' + txt + ' soon!', function () {
+          step = 'chat';
+          inp.disabled = false;
+          snd.disabled = false;
+        });
+      }
+      return;
+    }
+
+    // ── Live chat: visitor sends follow-up messages to the agent ─────────────
+    if (step === 'live') {
+      if (liveChatId && cfg.api) {
+        fetch(cfg.api + '/live-chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            partner_id:      cfg.partnerId,
-            visitor_name:    visitorName,
-            visitor_contact: visitorContact,
-            message:         lastQuestion,
+            action:       'message',
+            chat_id:      liveChatId,
+            content:      txt,
+            visitor_name: visitorName,
           })
-        }).then(function (r) { afterContactSubmit(r.ok); }).catch(function () { afterContactSubmit(false); });
-      } else {
-        afterContactSubmit(true);
+        }).catch(function () {});
       }
       return;
     }
 
     // ── Main AI chat ─────────────────────────────────────────────────────────
     if (!cfg.api) {
-      botDelay('Please reach out to us via the contact channels above — we\'d love to help!');
+      botDelay('Please reach out via the contact channels above — we\'d love to help!');
       return;
     }
 
@@ -256,11 +328,7 @@
     fetch(cfg.api + '/ai-chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        partner_id: cfg.partnerId,
-        message:    txt,
-        history:    historySnapshot,
-      })
+      body: JSON.stringify({ partner_id: cfg.partnerId, message: txt, history: historySnapshot })
     })
     .then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -273,10 +341,9 @@
       chatHistory.push({ role: 'assistant', content: reply });
       if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
       addMsg(reply, false);
-
       if (data.collect_info) {
         step = 'collect_name';
-        botDelay('To connect you with our team, may I have your name first?', function () {
+        botDelay('To connect you with a live agent, may I have your name first?', function () {
           inp.disabled = false;
           snd.disabled = false;
         });

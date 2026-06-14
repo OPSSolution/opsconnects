@@ -143,3 +143,77 @@ create policy "Partners update own support requests"
   );
 
 -- Edge Functions insert via service_role key → bypasses RLS
+
+-- ─────────────────────────────────────────────
+-- LIVE CHAT TABLES
+-- Real-time web chat between widget visitors and partner staff.
+-- Separate from channel webhooks — no external platform needed.
+-- ─────────────────────────────────────────────
+create table if not exists public.live_chats (
+  id              uuid        default gen_random_uuid() primary key,
+  partner_id      text        not null,   -- partners.partner_id text "PART-XXXX"
+  visitor_name    text        not null,
+  visitor_contact text        not null,
+  initial_message text,
+  status          text        not null default 'waiting'
+                              check (status in ('waiting', 'active', 'closed')),
+  assigned_agent  text,
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now()
+);
+
+create index if not exists live_chats_partner_idx
+  on public.live_chats (partner_id, created_at desc);
+
+create table if not exists public.live_chat_messages (
+  id          uuid        default gen_random_uuid() primary key,
+  chat_id     uuid        not null references public.live_chats(id) on delete cascade,
+  role        text        not null check (role in ('visitor', 'agent', 'ai')),
+  sender_name text,
+  content     text        not null,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists live_chat_messages_idx
+  on public.live_chat_messages (chat_id, created_at asc);
+
+alter table public.live_chats        enable row level security;
+alter table public.live_chat_messages enable row level security;
+
+drop policy if exists "Partners read own live chats"    on public.live_chats;
+drop policy if exists "Partners update own live chats"  on public.live_chats;
+
+create policy "Partners read own live chats"
+  on public.live_chats for select
+  using (partner_id in (select partner_id from public.partners where user_id = auth.uid()));
+
+create policy "Partners update own live chats"
+  on public.live_chats for update
+  using (partner_id in (select partner_id from public.partners where user_id = auth.uid()));
+
+drop policy if exists "Partners read live chat messages"   on public.live_chat_messages;
+drop policy if exists "Partners insert live chat messages" on public.live_chat_messages;
+
+create policy "Partners read live chat messages"
+  on public.live_chat_messages for select
+  using (
+    chat_id in (
+      select lc.id from public.live_chats lc
+      join public.partners p on p.partner_id = lc.partner_id
+      where p.user_id = auth.uid()
+    )
+  );
+
+create policy "Partners insert live chat messages"
+  on public.live_chat_messages for insert
+  with check (
+    chat_id in (
+      select lc.id from public.live_chats lc
+      join public.partners p on p.partner_id = lc.partner_id
+      where p.user_id = auth.uid()
+    )
+  );
+
+-- Enable Realtime for live chat tables
+alter publication supabase_realtime add table public.live_chats;
+alter publication supabase_realtime add table public.live_chat_messages;

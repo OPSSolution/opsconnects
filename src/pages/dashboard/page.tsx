@@ -8,6 +8,7 @@ import { getSession, getPartnerChannels } from "@/utils/auth";
 import { supabase } from "@/utils/supabase/client";
 import ChatReport from "./components/ChatReport";
 import SupportRequests from "./components/SupportRequests";
+import LiveChat from "./components/LiveChat";
 
 type TestState = "idle" | "testing" | "success" | "error";
 type BulkTestEntry = { channelId: string; status: TestState };
@@ -745,6 +746,9 @@ ${date.toISOString().split("T")[0]}
                     )}
                   </div>
                 )}
+                {/* Live Chat — real-time agent replies to widget visitors */}
+                <LiveChat partnerId={partnerIdState} />
+
                 {/* Support Requests — from the embedded chat widget */}
                 <SupportRequests partnerId={partnerIdState} />
 
