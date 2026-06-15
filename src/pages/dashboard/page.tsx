@@ -730,7 +730,7 @@ ${date.toISOString().split("T")[0]}
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
                       <h2 className="font-heading text-lg font-bold text-foreground-950">AI Chat Setup</h2>
-                      <span className="text-[10px] font-semibold bg-primary-100 text-primary-600 px-2 py-0.5 rounded-full">Llama 3.1</span>
+                      <span className="text-[10px] font-semibold bg-primary-100 text-primary-600 px-2 py-0.5 rounded-full">Llama 3.3 70B</span>
                     </div>
                     <button
                       onClick={() => setAiOpen(!aiOpen)}
@@ -814,7 +814,7 @@ ${date.toISOString().split("T")[0]}
                           <li>• Visitors ask questions in your widget → AI answers instantly using the context above</li>
                           <li>• When AI can't help, it collects the visitor's name + contact and notifies your team</li>
                           <li>• Escalated conversations appear in <strong className="text-foreground-700">Support Requests</strong> above</li>
-                          <li>• Model: Llama 3.1 8B via Groq — fast and free (up to 14,400 requests/day)</li>
+                          <li>• Model: Llama 3.3 70B via Groq — smarter and free (up to 14,400 requests/day)</li>
                         </ul>
                       </div>
                     </div>

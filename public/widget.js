@@ -219,8 +219,8 @@
       body: JSON.stringify({
         action:          'start',
         partner_id:      cfg.partnerId,
-        visitor_name:    visitorName,
-        visitor_contact: visitorContact,
+        visitor_name:    visitorName || 'Visitor',
+        visitor_contact: visitorContact || '',
         initial_message: lastQuestion,
         ai_history:      chatHistory.slice(-20),
       })
@@ -270,31 +270,6 @@
     addMsg(txt, true);
     inp.value = '';
 
-    // ── Collecting visitor name ───────────────────────────────────────────────
-    if (step === 'collect_name') {
-      visitorName = txt;
-      step = 'collect_contact';
-      botDelay('Thanks, ' + visitorName + '! What email address or phone number should we use to reach you?');
-      return;
-    }
-
-    // ── Collecting contact → start live chat session ──────────────────────────
-    if (step === 'collect_contact') {
-      visitorContact = txt;
-      inp.disabled = true;
-      snd.disabled = true;
-      if (cfg.api) {
-        startLiveChat();
-      } else {
-        botDelay('Your details have been received. Our team will contact you at ' + txt + ' soon!', function () {
-          step = 'chat';
-          inp.disabled = false;
-          snd.disabled = false;
-        });
-      }
-      return;
-    }
-
     // ── Live chat: visitor sends follow-up messages to the agent ─────────────
     if (step === 'live') {
       if (liveChatId && cfg.api) {
@@ -342,11 +317,16 @@
       if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
       addMsg(reply, false);
       if (data.collect_info) {
-        step = 'collect_name';
-        botDelay('To connect you with a live agent, may I have your name first?', function () {
-          inp.disabled = false;
-          snd.disabled = false;
-        });
+        inp.disabled = true;
+        snd.disabled = true;
+        if (cfg.api) {
+          startLiveChat();
+        } else {
+          botDelay('Please reach out via the contact channels above and our team will assist you!', function () {
+            inp.disabled = false;
+            snd.disabled = false;
+          });
+        }
       } else {
         inp.disabled = false;
         snd.disabled = false;
