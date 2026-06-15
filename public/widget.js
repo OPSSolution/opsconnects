@@ -296,14 +296,27 @@
       btn.className = '_ocw_chip';
       btn.textContent = label;
       btn.addEventListener('click', function () {
-        if (aiInp.disabled) return;   // AI is already thinking
         // Highlight selected chip
         if (activeChipEl) activeChipEl.classList.remove('active');
         activeChipEl = btn;
         btn.classList.add('active');
-        // Send the label to AI — chips stay visible after reply
-        aiInp.value = label;
-        sendAi();
+
+        // Show the user's selection as a bubble
+        addAiMsg(label, true);
+
+        // Show content directly from business context — NO AI call, NO escalation
+        var answer = content || null;
+        var dots = showDots(aiMsgs);
+        setTimeout(function () {
+          rmDots(dots);
+          var reply = answer || ('Here is the information about ' + label + '. For more details please type your question below.');
+          appendScroll(aiMsgs, msgEl(reply, false));
+          // Keep in history so follow-up questions have context
+          aiHistory.push({ role: 'user',      content: label });
+          aiHistory.push({ role: 'assistant', content: reply });
+          if (aiHistory.length > 20) aiHistory = aiHistory.slice(-20);
+        }, 400);
+        // Chips stay visible — user can keep exploring
       });
       row.appendChild(btn);
     });
@@ -545,8 +558,8 @@
   document.getElementById('_ocw_tab_ai').addEventListener('click', function () { switchTab('ai'); });
   document.getElementById('_ocw_tab_lv').addEventListener('click', function () { switchTab('lv'); });
   document.getElementById('_ocw_lv_connect').addEventListener('click', function () { if (cfg.api) autoConnect(); });
-  aiSnd.addEventListener('click', function () { if (aiInp.value.trim()) { hideChips(); sendAi(); } });
-  aiInp.addEventListener('keydown', function (e) { if (e.key === 'Enter' && aiInp.value.trim()) { hideChips(); sendAi(); } });
+  aiSnd.addEventListener('click', function () { hideChips(); sendAi(); });
+  aiInp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { hideChips(); sendAi(); } });
   lvSnd.addEventListener('click', sendLive);
   lvInp.addEventListener('keydown', function (e) { if (e.key === 'Enter') sendLive(); });
 })();
