@@ -44,6 +44,8 @@ export default function Dashboard() {
   const [widgetColorTo, setWidgetColorTo] = useState("#A033FF");
   const [widgetContacts, setWidgetContacts] = useState<Record<string, string>>({});
   const [widgetCopied, setWidgetCopied] = useState(false);
+  const [widgetSaving, setWidgetSaving] = useState(false);
+  const [widgetSaved, setWidgetSaved] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [aiContext, setAiContext] = useState("");
   const [aiContextSaving, setAiContextSaving] = useState(false);
@@ -55,14 +57,22 @@ export default function Dashboard() {
         setPartnerName(session.partnerName || null);
         setPartnerIdState(session.partnerId);
         setPartnerDbId(session.partnerDbId || null);
-        // Load AI business context
+        // Load AI context + widget settings
         if (session.partnerDbId) {
           const { data: pd } = await supabase
             .from("partners")
-            .select("ai_business_context")
+            .select("ai_business_context, widget_settings")
             .eq("id", session.partnerDbId)
             .maybeSingle();
           if (pd?.ai_business_context) setAiContext(pd.ai_business_context as string);
+          if (pd?.widget_settings) {
+            const ws = pd.widget_settings as Record<string, unknown>;
+            if (ws.name)      setWidgetName(ws.name as string);
+            if (ws.avatar)    setWidgetAvatar(ws.avatar as string);
+            if (ws.colorFrom) setWidgetColorFrom(ws.colorFrom as string);
+            if (ws.colorTo)   setWidgetColorTo(ws.colorTo as string);
+            if (ws.contacts)  setWidgetContacts(ws.contacts as Record<string, string>);
+          }
         }
         const name = session.partnerName || "";
         if (name) {
@@ -104,6 +114,31 @@ export default function Dashboard() {
   }, []);
 
   const showToast = (msg: string) => { setToastMessage(msg); setTimeout(() => setToastMessage(null), 2500); };
+
+  const saveWidgetSettings = async () => {
+    if (!partnerDbId) return;
+    setWidgetSaving(true);
+    const { error } = await supabase
+      .from("partners")
+      .update({
+        widget_settings: {
+          name: widgetName,
+          avatar: widgetAvatar,
+          colorFrom: widgetColorFrom,
+          colorTo: widgetColorTo,
+          contacts: widgetContacts,
+        },
+      })
+      .eq("id", partnerDbId);
+    setWidgetSaving(false);
+    if (!error) {
+      setWidgetSaved(true);
+      setTimeout(() => setWidgetSaved(false), 2500);
+      showToast("Widget settings saved!");
+    } else {
+      showToast("Error saving widget settings.");
+    }
+  };
 
   const saveAiContext = async () => {
     if (!partnerDbId) return;
@@ -695,7 +730,7 @@ ${date.toISOString().split("T")[0]}
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
                       <h2 className="font-heading text-lg font-bold text-foreground-950">AI Chat Setup</h2>
-                      <span className="text-[10px] font-semibold bg-primary-100 text-primary-600 px-2 py-0.5 rounded-full">Haiku 4.5</span>
+                      <span className="text-[10px] font-semibold bg-primary-100 text-primary-600 px-2 py-0.5 rounded-full">Llama 3.1</span>
                     </div>
                     <button
                       onClick={() => setAiOpen(!aiOpen)}
@@ -779,7 +814,7 @@ ${date.toISOString().split("T")[0]}
                           <li>• Visitors ask questions in your widget → AI answers instantly using the context above</li>
                           <li>• When AI can't help, it collects the visitor's name + contact and notifies your team</li>
                           <li>• Escalated conversations appear in <strong className="text-foreground-700">Support Requests</strong> above</li>
-                          <li>• Model: Claude Haiku 4.5 — fast and cost-effective (~$0.001 per conversation)</li>
+                          <li>• Model: Llama 3.1 8B via Groq — fast and free (up to 14,400 requests/day)</li>
                         </ul>
                       </div>
                     </div>
@@ -899,6 +934,30 @@ ${date.toISOString().split("T")[0]}
                             )}
                           </div>
                         </div>
+
+                        {/* Save settings */}
+                        {partnerDbId && (
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={saveWidgetSettings}
+                              disabled={widgetSaving}
+                              className={`text-sm font-semibold whitespace-nowrap cursor-pointer px-5 py-2.5 rounded-md transition-colors flex items-center gap-2 ${
+                                widgetSaved
+                                  ? "bg-accent-500 text-background-50"
+                                  : "bg-primary-500 text-background-50 hover:bg-primary-600"
+                              }`}
+                            >
+                              {widgetSaving ? (
+                                <><span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Saving…</>
+                              ) : widgetSaved ? (
+                                <><i className="ri-checkbox-circle-line" /> Saved!</>
+                              ) : (
+                                <><i className="ri-save-line" /> Save Settings</>
+                              )}
+                            </button>
+                            <p className="text-xs text-foreground-400">Settings are restored automatically next time you log in.</p>
+                          </div>
+                        )}
 
                         {/* Step 3: Generated code */}
                         <div>
