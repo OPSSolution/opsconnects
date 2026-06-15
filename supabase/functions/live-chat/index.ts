@@ -47,7 +47,7 @@ Deno.serve(async (req: Request) => {
   }
 
   let body: Record<string, unknown>;
-  try { body = await req.json(); }
+  try { body = await req.json() as Record<string, unknown>; }
   catch {
     return new Response(JSON.stringify({ error: "Invalid JSON" }), { status: 400, headers: CORS });
   }
@@ -62,9 +62,9 @@ Deno.serve(async (req: Request) => {
     const initialMsg   = body.initial_message as string | undefined;
     const aiHistory    = body.ai_history     as AiMessage[] | undefined;
 
-    if (!partnerId || !visitorName || !visitorContact) {
+    if (!partnerId || !visitorName) {
       return new Response(
-        JSON.stringify({ error: "partner_id, visitor_name, visitor_contact required" }),
+        JSON.stringify({ error: "partner_id and visitor_name required" }),
         { status: 400, headers: CORS }
       );
     }
