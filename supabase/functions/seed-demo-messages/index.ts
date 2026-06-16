@@ -63,7 +63,7 @@ function daysAgo(n: number): string {
 Deno.serve(async (req: Request) => {
   const cors = {
     "Access-Control-Allow-Origin":  "*",
-    "Access-Control-Allow-Headers": "authorization, content-type",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
     "Content-Type":                 "application/json",
   };
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -71,8 +71,8 @@ Deno.serve(async (req: Request) => {
 
   let partnerId: string | undefined;
   try {
-    const body = await req.json();
-    partnerId = body.partner_id;
+    const body = await req.json() as Record<string, unknown>;
+    partnerId = body.partner_id as string | undefined;
   } catch {
     return new Response(JSON.stringify({ error: "Invalid JSON" }), { status: 400, headers: cors });
   }

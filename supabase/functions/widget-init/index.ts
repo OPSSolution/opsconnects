@@ -6,7 +6,7 @@ const GROQ_API_KEY              = Deno.env.get("GROQ_API_KEY")!;
 
 const CORS = {
   "Access-Control-Allow-Origin":  "*",
-  "Access-Control-Allow-Headers": "authorization, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Content-Type":                 "application/json",
 };
 
