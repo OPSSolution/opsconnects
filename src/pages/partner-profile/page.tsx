@@ -27,8 +27,6 @@ export default function PartnerProfile() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const supabaseApi = (import.meta.env.VITE_PUBLIC_SUPABASE_URL as string) + "/functions/v1";
-
   useEffect(() => {
     const name = localStorage.getItem("omni_partner_name") || "";
     const id   = localStorage.getItem("omni_partner_id");
@@ -82,21 +80,18 @@ export default function PartnerProfile() {
     }
     setAddingMember(true);
     const avatarColor = avatarPalette[Math.floor(Math.random() * avatarPalette.length)];
-    const res = await fetch(`${supabaseApi}/create-agent`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    const { data, error: fnError } = await supabase.functions.invoke("create-agent", {
+      body: {
         partner_id:   partnerId,
         name:         newMember.name.trim(),
         email:        newMember.email.trim().toLowerCase(),
         password:     newMember.password,
         role:         newMember.role,
         avatar_color: avatarColor,
-      }),
+      },
     });
-    const data = await res.json();
     setAddingMember(false);
-    if (!res.ok || data.error) { showToast(data.error ?? "Failed to add member.", true); return; }
+    if (fnError || data?.error) { showToast(data?.error ?? fnError?.message ?? "Failed to add member.", true); return; }
     const a = data.agent;
     setTeamMembers((prev) => [...prev, { id: a.id, name: a.name, email: a.email, role: a.role, avatarColor: a.avatar_color ?? avatarColor }]);
     setNewMember({ name: "", email: "", password: "", role: "Agent" });
@@ -106,14 +101,12 @@ export default function PartnerProfile() {
 
   const handleRemoveMember = async (id: string) => {
     setDeletingId(id);
-    const res = await fetch(`${supabaseApi}/delete-agent`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ agent_id: id }),
+    const { error: fnError } = await supabase.functions.invoke("delete-agent", {
+      body: { agent_id: id },
     });
     setDeletingId(null);
     setDeleteConfirm(null);
-    if (!res.ok) { showToast("Failed to remove member.", true); return; }
+    if (fnError) { showToast(fnError.message ?? "Failed to remove member.", true); return; }
     setTeamMembers((prev) => prev.filter((m) => m.id !== id));
     showToast("Team member removed.");
   };
