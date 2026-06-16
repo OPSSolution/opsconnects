@@ -395,6 +395,10 @@
   function autoConnect() {
     if (liveStep !== 'idle') return;
     liveStep = 'collect_name';
+    visitorName = '';
+    visitorContact = '';
+    liveChatId = null;
+    lvMsgs.innerHTML = '';
     lvIdle.style.display = 'none';
     lvChat.style.display = 'flex';
     lvInp.disabled = false;
@@ -437,17 +441,27 @@
       startPolling();
     })
     .catch(function () {
-      addLvSys('Could not connect right now. Please try again or use a channel below.');
-      liveStep = 'idle';
-      lvIdle.style.display = 'flex';
-      lvChat.style.display = 'none';
+      addLvSys('Could not connect right now. Press Send to try again.');
+      liveStep = 'failed';
+      lvInp.disabled = false;
+      lvSnd.disabled = false;
+      lvInp.placeholder = 'Press Send to retry…';
+      lvInp.value = '';
     });
   }
 
   // ── Send live message (handles collection steps + live chat) ─────
   function sendLive() {
     var txt = lvInp.value.trim();
-    if (!txt || lvInp.disabled) return;
+    if (lvInp.disabled) return;
+
+    // Retry connection with already-collected info (no re-collection needed)
+    if (liveStep === 'failed') {
+      doConnect();
+      return;
+    }
+
+    if (!txt) return;
     addLvMsg(txt, true);
     lvInp.value = '';
 
