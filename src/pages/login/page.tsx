@@ -12,7 +12,7 @@ export default function Login() {
 
   useEffect(() => {
     getSession().then((s) => {
-      if (s) navigate(s.role === "admin" ? "/admin" : s.role === "agent" ? "/agent" : "/dashboard", { replace: true });
+      if (s) navigate(s.role === "admin" ? "/admin" : s.role === "agent" ? "/agent" : s.role === "viewer" ? "/viewer" : "/dashboard", { replace: true });
     });
   }, []);
 

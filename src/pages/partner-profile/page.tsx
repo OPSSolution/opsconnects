@@ -10,7 +10,7 @@ function getInitials(name: string): string {
   return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
 }
 
-const roles = ["Admin", "Agent", "Viewer"];
+const roles = ["Agent", "Viewer"];
 const avatarPalette = ["#E4405F", "#26A5E4", "#25D366", "#FF6B35", "#0084FF", "#07C160", "#00C300", "#EA4335"];
 
 export default function PartnerProfile() {
@@ -355,7 +355,7 @@ export default function PartnerProfile() {
                   {roles.map((role) => (
                     <div key={role} className="flex items-center gap-1.5">
                       <span className="w-2 h-2 rounded-full bg-foreground-300" />
-                      <span className="text-[11px] text-foreground-500">{role}: {role === "Admin" ? "Full access to all settings" : role === "Agent" ? "Can manage conversations" : "Read-only access"}</span>
+                      <span className="text-[11px] text-foreground-500">{role}: {role === "Agent" ? "Handle live chat conversations" : "Read-only analytics & report exports"}</span>
                     </div>
                   ))}
                 </div>

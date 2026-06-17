@@ -1,13 +1,13 @@
 import { supabase } from "./supabase/client";
 
 export interface Session {
-  role: "partner" | "admin" | "agent";
+  role: "partner" | "admin" | "agent" | "viewer";
   partnerId: string;
-  partnerDbId?: string;   // UUID — used for messages table queries
+  partnerDbId?: string;
   partnerName: string;
   email: string;
   agentName?: string;
-  agentRole?: string;     // 'Admin' | 'Agent' | 'Viewer'
+  agentRole?: string;
 }
 
 export interface PartnerRecord {
@@ -86,8 +86,9 @@ export async function getSession(): Promise<Session | null> {
       .select("partner_name")
       .eq("partner_id", agent.partner_id)
       .maybeSingle();
+    const isViewer = (agent.role as string).toLowerCase() === "viewer";
     const s: Session = {
-      role: "agent",
+      role: isViewer ? "viewer" : "agent",
       partnerId: agent.partner_id as string,
       partnerName: (partnerData?.partner_name as string) ?? "",
       email: agent.email as string,

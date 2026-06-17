@@ -4,7 +4,14 @@ import { getSession } from "@/utils/auth";
 
 interface AuthGuardProps {
   children: React.ReactNode;
-  require?: "partner" | "admin" | "agent" | "any";
+  require?: "partner" | "admin" | "agent" | "viewer" | "any";
+}
+
+function homeFor(role: string) {
+  if (role === "admin")  return "/admin";
+  if (role === "agent")  return "/agent";
+  if (role === "viewer") return "/viewer";
+  return "/dashboard";
 }
 
 export default function AuthGuard({ children, require: required = "any" }: AuthGuardProps) {
@@ -18,17 +25,14 @@ export default function AuthGuard({ children, require: required = "any" }: AuthG
         navigate("/login", { replace: true });
         return;
       }
-      if (required === "admin" && session.role !== "admin") {
-        navigate(session.role === "agent" ? "/agent" : "/dashboard", { replace: true });
+      // Strict role pages: bounce wrong roles to their own home
+      if (required !== "any" && session.role !== required) {
+        navigate(homeFor(session.role), { replace: true });
         return;
       }
-      if (required === "agent" && session.role !== "agent") {
-        navigate(session.role === "admin" ? "/admin" : "/dashboard", { replace: true });
-        return;
-      }
-      // Agents visiting general partner routes → send to /agent
-      if (required === "any" && session.role === "agent") {
-        navigate("/agent", { replace: true });
+      // Agents/viewers visiting general partner routes → their own home
+      if (required === "any" && (session.role === "agent" || session.role === "viewer")) {
+        navigate(homeFor(session.role), { replace: true });
         return;
       }
       setAllowed(true);

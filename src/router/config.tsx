@@ -13,6 +13,7 @@ import ForgotPassword from "../pages/forgot-password/page";
 import ResetPassword from "../pages/reset-password/page";
 import AdminDashboard from "../pages/admin/page";
 import AgentDashboard from "../pages/agent/page";
+import ViewerDashboard from "../pages/viewer/page";
 import AuthGuard from "../components/feature/AuthGuard";
 
 const routes: RouteObject[] = [
@@ -43,6 +44,10 @@ const routes: RouteObject[] = [
   {
     path: "/agent",
     element: <AuthGuard require="agent"><AgentDashboard /></AuthGuard>,
+  },
+  {
+    path: "/viewer",
+    element: <AuthGuard require="viewer"><ViewerDashboard /></AuthGuard>,
   },
   { path: "*", element: <NotFound /> },
 ];
