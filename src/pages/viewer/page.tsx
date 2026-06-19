@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { Fragment, useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { getSession, clearSession } from "@/utils/auth";
 import { supabase } from "@/utils/supabase/client";
@@ -9,23 +9,34 @@ type Chat = {
   visitor_contact: string;
   initial_message: string | null;
   status: string;
+  assigned_agent: string | null;
   created_at: string;
 };
 
 type MsgRow = {
+  id: string;
   chat_id: string;
-  role: string;
-  sender_name: string;
+  role: "visitor" | "agent" | "ai";
+  sender_name: string | null;
+  content: string;
   created_at: string;
 };
 
 type AgentStat = { name: string; messages: number; chats: number };
+type ChatSupportMeta = {
+  agentNames: string[];
+  messageCount: number;
+  supportedAt: string | null;
+};
 
 function fmtDate(ts: string) {
   return new Date(ts).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 function fmtDateTime(ts: string) {
   return new Date(ts).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+function fmtTime(ts: string) {
+  return new Date(ts).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 }
 
 function escapeCsv(val: string | null | undefined) {
@@ -56,8 +67,12 @@ export default function ViewerDashboard() {
   // Filters
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo]     = useState("");
+  const [supportedFrom, setSupportedFrom] = useState("");
+  const [supportedTo, setSupportedTo]     = useState("");
+  const [agentFilter, setAgentFilter]     = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [search, setSearch]     = useState("");
+  const [expandedChatId, setExpandedChatId] = useState<string | null>(null);
   const [tab, setTab]           = useState<"overview" | "history" | "agents">("overview");
 
   useEffect(() => {
@@ -74,7 +89,7 @@ export default function ViewerDashboard() {
     setLoading(true);
     const { data: chatData } = await supabase
       .from("live_chats")
-      .select("id, visitor_name, visitor_contact, initial_message, status, created_at")
+      .select("id, visitor_name, visitor_contact, initial_message, status, assigned_agent, created_at")
       .eq("partner_id", pid)
       .order("created_at", { ascending: false });
 
@@ -85,9 +100,12 @@ export default function ViewerDashboard() {
       const ids = allChats.map((c) => c.id);
       const { data: msgData } = await supabase
         .from("live_chat_messages")
-        .select("chat_id, role, sender_name, created_at")
-        .in("chat_id", ids);
+        .select("id, chat_id, role, sender_name, content, created_at")
+        .in("chat_id", ids)
+        .order("created_at", { ascending: true });
       setMsgs((msgData ?? []) as MsgRow[]);
+    } else {
+      setMsgs([]);
     }
     setLoading(false);
   }, []);
@@ -113,7 +131,7 @@ export default function ViewerDashboard() {
   // Agent performance
   const agentMap = new Map<string, AgentStat>();
   msgs.filter((m) => m.role === "agent").forEach((m) => {
-    const key = m.sender_name;
+    const key = m.sender_name || "Agent";
     const existing = agentMap.get(key) ?? { name: key, messages: 0, chats: 0 };
     existing.messages += 1;
     agentMap.set(key, existing);
@@ -121,8 +139,9 @@ export default function ViewerDashboard() {
   // Count distinct chats per agent
   const agentChatMap = new Map<string, Set<string>>();
   msgs.filter((m) => m.role === "agent").forEach((m) => {
-    if (!agentChatMap.has(m.sender_name)) agentChatMap.set(m.sender_name, new Set());
-    agentChatMap.get(m.sender_name)!.add(m.chat_id);
+    const name = m.sender_name || "Agent";
+    if (!agentChatMap.has(name)) agentChatMap.set(name, new Set());
+    agentChatMap.get(name)!.add(m.chat_id);
   });
   const agentStats: AgentStat[] = Array.from(agentMap.values()).map((a) => ({
     ...a,
@@ -142,30 +161,65 @@ export default function ViewerDashboard() {
   }));
   const maxDay = Math.max(...chatsByDay.map((d) => d.count), 1);
 
+  const messagesByChat = msgs.reduce((acc, msg) => {
+    const list = acc.get(msg.chat_id) ?? [];
+    list.push(msg);
+    acc.set(msg.chat_id, list);
+    return acc;
+  }, new Map<string, MsgRow[]>());
+
+  const chatSupport = chats.reduce((acc, chat) => {
+    const chatMsgs = messagesByChat.get(chat.id) ?? [];
+    const agentMsgs = chatMsgs.filter((m) => m.role === "agent");
+    const agentNames = Array.from(new Set([
+      ...(chat.assigned_agent ? [chat.assigned_agent] : []),
+      ...agentMsgs.map((m) => m.sender_name || "Agent"),
+    ])).filter(Boolean);
+
+    acc.set(chat.id, {
+      agentNames,
+      messageCount: chatMsgs.length,
+      supportedAt: agentMsgs[0]?.created_at ?? null,
+    });
+    return acc;
+  }, new Map<string, ChatSupportMeta>());
+
+  const agentOptions = Array.from(new Set(
+    chats.flatMap((chat) => chatSupport.get(chat.id)?.agentNames ?? [])
+  )).sort((a, b) => a.localeCompare(b));
+
   // ── Filtered chat history ───────────────────────────────────────────────────
   const filtered = chats.filter((c) => {
+    const supportMeta = chatSupport.get(c.id);
     if (statusFilter !== "all" && c.status !== statusFilter) return false;
+    if (agentFilter !== "all" && !supportMeta?.agentNames.includes(agentFilter)) return false;
     if (dateFrom && c.created_at < dateFrom) return false;
     if (dateTo   && c.created_at > dateTo + "T23:59:59") return false;
+    if (supportedFrom && (!supportMeta?.supportedAt || supportMeta.supportedAt < supportedFrom)) return false;
+    if (supportedTo && (!supportMeta?.supportedAt || supportMeta.supportedAt > supportedTo)) return false;
     if (search) {
       const q = search.toLowerCase();
-      if (!c.visitor_name.toLowerCase().includes(q) && !c.visitor_contact.toLowerCase().includes(q)) return false;
+      const chatMsgs = messagesByChat.get(c.id) ?? [];
+      const matchesThread = chatMsgs.some((m) => m.content.toLowerCase().includes(q) || (m.sender_name ?? "").toLowerCase().includes(q));
+      if (!c.visitor_name.toLowerCase().includes(q) && !c.visitor_contact.toLowerCase().includes(q) && !matchesThread) return false;
     }
     return true;
   });
 
   // ── Exports ──────────────────────────────────────────────────────────────────
   const exportChatsCSV = () => {
-    const headers = ["Date", "Visitor Name", "Contact", "Status", "Initial Message", "Messages Count"];
+    const headers = ["Date", "Visitor Name", "Contact", "Status", "Support Agent", "Date/Time Supported", "Initial Message", "Messages Count"];
     const rows = filtered.map((c) => {
-      const msgCount = msgs.filter((m) => m.chat_id === c.id).length;
+      const supportMeta = chatSupport.get(c.id);
       return [
         fmtDate(c.created_at),
         c.visitor_name,
         c.visitor_contact,
         c.status,
+        supportMeta?.agentNames.join(" / ") || "",
+        supportMeta?.supportedAt ? fmtDateTime(supportMeta.supportedAt) : "",
         c.initial_message ?? "",
-        String(msgCount),
+        String(supportMeta?.messageCount ?? 0),
       ].map(escapeCsv).join(",");
     });
     downloadFile([headers.map(escapeCsv).join(","), ...rows].join("\n"), `chat-history-${partnerId}.csv`, "text/csv;charset=utf-8;");
@@ -347,6 +401,14 @@ export default function ViewerDashboard() {
                         className="bg-background-50 border border-background-200/70 rounded-lg px-3 py-2 text-sm text-foreground-800 outline-none focus:border-primary-400 cursor-pointer" />
                     </div>
                     <div>
+                      <label className="block text-[10px] font-semibold uppercase tracking-wider text-foreground-400 mb-1">Support Agent</label>
+                      <select value={agentFilter} onChange={(e) => setAgentFilter(e.target.value)}
+                        className="bg-background-50 border border-background-200/70 rounded-lg px-3 py-2 text-sm text-foreground-800 outline-none focus:border-primary-400 cursor-pointer appearance-none">
+                        <option value="all">All agents</option>
+                        {agentOptions.map((agent) => <option key={agent} value={agent}>{agent}</option>)}
+                      </select>
+                    </div>
+                    <div>
                       <label className="block text-[10px] font-semibold uppercase tracking-wider text-foreground-400 mb-1">Status</label>
                       <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
                         className="bg-background-50 border border-background-200/70 rounded-lg px-3 py-2 text-sm text-foreground-800 outline-none focus:border-primary-400 cursor-pointer appearance-none">
@@ -356,9 +418,19 @@ export default function ViewerDashboard() {
                         <option value="closed">Closed</option>
                       </select>
                     </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold uppercase tracking-wider text-foreground-400 mb-1">Supported From</label>
+                      <input type="datetime-local" value={supportedFrom} onChange={(e) => setSupportedFrom(e.target.value)}
+                        className="bg-background-50 border border-background-200/70 rounded-lg px-3 py-2 text-sm text-foreground-800 outline-none focus:border-primary-400 cursor-pointer" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold uppercase tracking-wider text-foreground-400 mb-1">Supported To</label>
+                      <input type="datetime-local" value={supportedTo} onChange={(e) => setSupportedTo(e.target.value)}
+                        className="bg-background-50 border border-background-200/70 rounded-lg px-3 py-2 text-sm text-foreground-800 outline-none focus:border-primary-400 cursor-pointer" />
+                    </div>
                     <div className="flex-1 min-w-40">
                       <label className="block text-[10px] font-semibold uppercase tracking-wider text-foreground-400 mb-1">Search</label>
-                      <input type="text" placeholder="Name or contact…" value={search} onChange={(e) => setSearch(e.target.value)}
+                      <input type="text" placeholder="Name, contact, agent, or message..." value={search} onChange={(e) => setSearch(e.target.value)}
                         className="w-full bg-background-50 border border-background-200/70 rounded-lg px-3 py-2 text-sm text-foreground-800 outline-none focus:border-primary-400 placeholder:text-foreground-300" />
                     </div>
                     <button onClick={exportChatsCSV}
@@ -378,39 +450,88 @@ export default function ViewerDashboard() {
                           <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-foreground-400">Date</th>
                           <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-foreground-400">Visitor</th>
                           <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-foreground-400 hidden md:table-cell">Contact</th>
+                          <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-foreground-400 hidden lg:table-cell">Support Agent</th>
+                          <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-foreground-400 hidden xl:table-cell">Supported</th>
                           <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-foreground-400">Status</th>
                           <th className="text-left px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-foreground-400 hidden lg:table-cell">Initial Message</th>
                           <th className="text-right px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-foreground-400">Msgs</th>
+                          <th className="text-right px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-foreground-400">History</th>
                         </tr>
                       </thead>
                       <tbody>
                         {filtered.length === 0 ? (
-                          <tr><td colSpan={6} className="text-center py-12 text-sm text-foreground-400">No conversations match your filters</td></tr>
+                          <tr><td colSpan={9} className="text-center py-12 text-sm text-foreground-400">No conversations match your filters</td></tr>
                         ) : (
                           filtered.map((c) => {
-                            const msgCount = msgs.filter((m) => m.chat_id === c.id).length;
-                            const hasAgent = msgs.some((m) => m.chat_id === c.id && m.role === "agent");
+                            const supportMeta = chatSupport.get(c.id);
+                            const thread = messagesByChat.get(c.id) ?? [];
+                            const hasAgent = (supportMeta?.agentNames.length ?? 0) > 0;
+                            const isExpanded = expandedChatId === c.id;
                             return (
-                              <tr key={c.id} className="border-b border-background-200/50 hover:bg-background-50 transition-colors">
-                                <td className="px-4 py-3 text-xs text-foreground-500 whitespace-nowrap">{fmtDateTime(c.created_at)}</td>
-                                <td className="px-4 py-3">
-                                  <p className="font-medium text-foreground-900 text-sm">{c.visitor_name}</p>
-                                  <p className="text-xs text-foreground-400 md:hidden">{c.visitor_contact}</p>
-                                </td>
-                                <td className="px-4 py-3 text-xs text-foreground-500 hidden md:table-cell">{c.visitor_contact}</td>
-                                <td className="px-4 py-3">
-                                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
-                                    c.status === "waiting" ? "bg-yellow-100 text-yellow-700" :
-                                    c.status === "active"  ? "bg-green-100 text-green-700" :
-                                    "bg-background-200 text-foreground-600"
-                                  }`}>
-                                    {c.status}
-                                  </span>
-                                  {hasAgent && <span className="ml-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary-100 text-primary-700">Live</span>}
-                                </td>
-                                <td className="px-4 py-3 text-xs text-foreground-500 hidden lg:table-cell max-w-xs truncate">{c.initial_message ?? "—"}</td>
-                                <td className="px-4 py-3 text-xs text-foreground-500 text-right font-medium">{msgCount}</td>
-                              </tr>
+                              <Fragment key={c.id}>
+                                <tr className="border-b border-background-200/50 hover:bg-background-50 transition-colors">
+                                  <td className="px-4 py-3 text-xs text-foreground-500 whitespace-nowrap">{fmtDateTime(c.created_at)}</td>
+                                  <td className="px-4 py-3">
+                                    <p className="font-medium text-foreground-900 text-sm">{c.visitor_name}</p>
+                                    <p className="text-xs text-foreground-400 md:hidden">{c.visitor_contact}</p>
+                                    <p className="text-xs text-foreground-400 lg:hidden">{supportMeta?.agentNames.join(", ") || "No agent yet"}</p>
+                                  </td>
+                                  <td className="px-4 py-3 text-xs text-foreground-500 hidden md:table-cell">{c.visitor_contact}</td>
+                                  <td className="px-4 py-3 text-xs text-foreground-600 hidden lg:table-cell">{supportMeta?.agentNames.join(", ") || "—"}</td>
+                                  <td className="px-4 py-3 text-xs text-foreground-500 hidden xl:table-cell whitespace-nowrap">{supportMeta?.supportedAt ? fmtDateTime(supportMeta.supportedAt) : "—"}</td>
+                                  <td className="px-4 py-3">
+                                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                                      c.status === "waiting" ? "bg-yellow-100 text-yellow-700" :
+                                      c.status === "active"  ? "bg-green-100 text-green-700" :
+                                      "bg-background-200 text-foreground-600"
+                                    }`}>
+                                      {c.status}
+                                    </span>
+                                    {hasAgent && <span className="ml-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary-100 text-primary-700">Live</span>}
+                                  </td>
+                                  <td className="px-4 py-3 text-xs text-foreground-500 hidden lg:table-cell max-w-xs truncate">{c.initial_message ?? "—"}</td>
+                                  <td className="px-4 py-3 text-xs text-foreground-500 text-right font-medium">{supportMeta?.messageCount ?? 0}</td>
+                                  <td className="px-4 py-3 text-right">
+                                    <button
+                                      onClick={() => setExpandedChatId(isExpanded ? null : c.id)}
+                                      className="text-xs font-semibold text-primary-600 hover:text-primary-700 transition-colors cursor-pointer whitespace-nowrap"
+                                    >
+                                      {isExpanded ? "Hide" : "View"}
+                                    </button>
+                                  </td>
+                                </tr>
+                                {isExpanded && (
+                                  <tr className="border-b border-background-200/70 bg-background-50/70">
+                                    <td colSpan={9} className="px-4 py-4">
+                                      {thread.length === 0 ? (
+                                        <p className="text-xs text-foreground-400 text-center py-6">No message history for this conversation</p>
+                                      ) : (
+                                        <div className="max-h-96 overflow-y-auto space-y-2 pr-1">
+                                          {thread.map((msg) => {
+                                            const isAgent = msg.role === "agent";
+                                            const isAi = msg.role === "ai";
+                                            return (
+                                              <div key={msg.id} className={`flex ${isAgent ? "justify-end" : "justify-start"}`}>
+                                                <div className={`max-w-[82%] rounded-2xl px-3 py-2 text-xs leading-relaxed ${
+                                                  isAgent ? "bg-primary-500 text-white rounded-br-sm" :
+                                                  isAi ? "bg-purple-50 border border-purple-100 text-foreground-700 rounded-bl-sm" :
+                                                  "bg-background-100 border border-background-200/70 text-foreground-800 rounded-bl-sm"
+                                                }`}>
+                                                  <p className={`text-[10px] font-semibold mb-0.5 ${isAgent ? "text-primary-100" : isAi ? "text-purple-400" : "text-foreground-400"}`}>
+                                                    {isAgent ? (msg.sender_name || "Agent") : isAi ? "AI Assistant" : (msg.sender_name || c.visitor_name)}
+                                                    <span className={`font-normal ml-2 ${isAgent ? "text-primary-200" : "text-foreground-300"}`}>{fmtTime(msg.created_at)}</span>
+                                                  </p>
+                                                  <p className="whitespace-pre-wrap break-words">{msg.content}</p>
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+                                    </td>
+                                  </tr>
+                                )}
+                              </Fragment>
                             );
                           })
                         )}
