@@ -2,6 +2,13 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getSession, signIn, ADMIN_EMAIL, ADMIN_PASSWORD } from "@/utils/auth";
 
+function dashboardFor(role: string) {
+  if (role === "admin") return "/admin";
+  if (role === "agent") return "/agent";
+  if (role === "viewer") return "/viewer";
+  return "/dashboard";
+}
+
 export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
@@ -12,9 +19,9 @@ export default function Login() {
 
   useEffect(() => {
     getSession().then((s) => {
-      if (s) navigate(s.role === "admin" ? "/admin" : s.role === "agent" ? "/agent" : s.role === "viewer" ? "/viewer" : "/dashboard", { replace: true });
+      if (s) navigate(dashboardFor(s.role), { replace: true });
     });
-  }, []);
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +36,7 @@ export default function Login() {
       return;
     }
 
-    navigate(session.role === "admin" ? "/admin" : session.role === "agent" ? "/agent" : "/dashboard", { replace: true });
+    navigate(dashboardFor(session.role), { replace: true });
   };
 
   return (

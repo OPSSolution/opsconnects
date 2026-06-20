@@ -10,6 +10,8 @@ out/
 .env
 .env.local
 .env.*.local
+Guidance.txt
+supabase/.temp/
 
 # Logs
 *.log
@@ -20,6 +22,7 @@ yarn-error.log*
 # Editor / OS
 .DS_Store
 .vscode/
+.claude/settings.local.json
 *.suo
 *.ntvs*
 *.njsproj

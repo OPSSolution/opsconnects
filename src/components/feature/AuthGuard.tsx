@@ -38,7 +38,7 @@ export default function AuthGuard({ children, require: required = "any" }: AuthG
       setAllowed(true);
       setReady(true);
     });
-  }, []);
+  }, [navigate, required]);
 
   if (!ready) {
     return (

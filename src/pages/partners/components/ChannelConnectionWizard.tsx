@@ -190,8 +190,9 @@ export default function ChannelConnectionWizard() {
 
   // Cleanup timers on unmount
   useEffect(() => {
+    const timers = testTimersRef.current;
     return () => {
-      Object.values(testTimersRef.current).forEach((t) => clearTimeout(t));
+      Object.values(timers).forEach((t) => clearTimeout(t));
     };
   }, []);
 

@@ -43,12 +43,12 @@ export default function AgentDashboard() {
   useEffect(() => {
     getSession().then((s) => {
       if (!s) { navigate("/login", { replace: true }); return; }
-      if (s.role !== "agent") { navigate(s.role === "admin" ? "/admin" : "/dashboard", { replace: true }); return; }
+      if (s.role !== "agent") { navigate(s.role === "admin" ? "/admin" : s.role === "viewer" ? "/viewer" : "/dashboard", { replace: true }); return; }
       setAgentName(s.agentName ?? s.email);
       setPartnerId(s.partnerId);
       setPartnerName(s.partnerName);
     });
-  }, []);
+  }, [navigate]);
 
   const loadChats = useCallback(async (pid: string) => {
     const { data } = await supabase
@@ -76,12 +76,14 @@ export default function AgentDashboard() {
     if (data) setMessages(data as Message[]);
   }, []);
 
+  const activeChatId = activeChat?.id;
+
   // Poll for new messages in active chat
   useEffect(() => {
-    if (!activeChat) return;
-    const interval = setInterval(() => loadMessages(activeChat.id), 3000);
+    if (!activeChatId) return;
+    const interval = setInterval(() => loadMessages(activeChatId), 3000);
     return () => clearInterval(interval);
-  }, [activeChat?.id, loadMessages]);
+  }, [activeChatId, loadMessages]);
 
   // Scroll to bottom when messages change
   useEffect(() => {

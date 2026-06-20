@@ -83,7 +83,7 @@ export default function ViewerDashboard() {
       setViewerName(s.agentName ?? s.email);
       setPartnerId(s.partnerId);
     });
-  }, []);
+  }, [navigate]);
 
   const load = useCallback(async (pid: string) => {
     setLoading(true);

@@ -2,6 +2,13 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getSession, signUp } from "@/utils/auth";
 
+function dashboardFor(role: string) {
+  if (role === "admin") return "/admin";
+  if (role === "agent") return "/agent";
+  if (role === "viewer") return "/viewer";
+  return "/dashboard";
+}
+
 const CHANNELS = [
   { id: "whatsapp",  label: "WhatsApp",  icon: "ri-whatsapp-line",  color: "#25D366" },
   { id: "messenger", label: "Messenger", icon: "ri-messenger-line",  color: "#0084FF" },
@@ -28,9 +35,9 @@ export default function Register() {
 
   useEffect(() => {
     getSession().then((s) => {
-      if (s) navigate(s.role === "admin" ? "/admin" : "/dashboard", { replace: true });
+      if (s) navigate(dashboardFor(s.role), { replace: true });
     });
-  }, []);
+  }, [navigate]);
 
   const validateStep1 = () => {
     const e: Record<string, string> = {};

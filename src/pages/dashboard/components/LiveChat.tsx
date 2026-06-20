@@ -85,30 +85,32 @@ export default function LiveChat({ partnerId }: Props) {
     return () => { supabase.removeChannel(ch); };
   }, [partnerId]);
 
+  const activeChatId = activeChat?.id;
+
   useEffect(() => {
-    if (!activeChat) { setMessages([]); return; }
+    if (!activeChatId) { setMessages([]); return; }
 
     supabase
       .from("live_chat_messages")
       .select("*")
-      .eq("chat_id", activeChat.id)
+      .eq("chat_id", activeChatId)
       .order("created_at", { ascending: true })
       .then(({ data }) => { if (data) setMessages(data as ChatMessage[]); });
 
-    supabase.from("live_chats").update({ status: "active" }).eq("id", activeChat.id)
+    supabase.from("live_chats").update({ status: "active" }).eq("id", activeChatId)
       .then(({ error }) => { if (error) console.error("[LiveChat] status update failed:", error.message); });
 
     const ch = supabase
-      .channel(`msgs_${activeChat.id}`)
+      .channel(`msgs_${activeChatId}`)
       .on("postgres_changes",
-        { event: "INSERT", schema: "public", table: "live_chat_messages", filter: `chat_id=eq.${activeChat.id}` },
+        { event: "INSERT", schema: "public", table: "live_chat_messages", filter: `chat_id=eq.${activeChatId}` },
         (payload) => setMessages((prev) => [...prev, payload.new as ChatMessage])
       )
       .subscribe();
 
     setTimeout(() => replyInputRef.current?.focus(), 150);
     return () => { supabase.removeChannel(ch); };
-  }, [activeChat?.id]);
+  }, [activeChatId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
