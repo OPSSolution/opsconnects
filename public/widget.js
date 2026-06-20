@@ -19,6 +19,7 @@
  *   </script>
  *
  *  data-lang is optional — auto-detected from browser language if omitted.
+ *  Visitors can also switch language using the globe icon in the widget sidebar.
  *  Supported: en, km, zh, ja, ko, th, vi, id, fr, es
  */
 (function () {
@@ -60,6 +61,7 @@
     en: {
       sublbl_ai:               'AI Assistant · Online now',
       sublbl_lv:               'Live Agent · Online now',
+      sublbl_lang:             'Select Language',
       ai_placeholder:          'Ask me anything…',
       lv_title:                'Talk to a Live Agent',
       lv_desc:                 'Connect directly with the {name} support team for personalized help.',
@@ -81,6 +83,7 @@
     km: {
       sublbl_ai:               'AI · អនឡាញ',
       sublbl_lv:               'ភ្នាក់ងារ · អនឡាញ',
+      sublbl_lang:             'ជ្រើសរើសភាសា',
       ai_placeholder:          'សួរខ្ញុំអ្វីក៏បាន…',
       lv_title:                'ពិគ្រោះជាមួយភ្នាក់ងារ',
       lv_desc:                 'ភ្ជាប់ទំនាក់ទំនងជាមួយក្រុមផ្ដល់ជំនួយ {name}។',
@@ -102,6 +105,7 @@
     zh: {
       sublbl_ai:               'AI 助手 · 在线',
       sublbl_lv:               '在线客服 · 在线',
+      sublbl_lang:             '选择语言',
       ai_placeholder:          '有什么可以帮您…',
       lv_title:                '联系人工客服',
       lv_desc:                 '直接与 {name} 支持团队联系，获得个性化帮助。',
@@ -123,6 +127,7 @@
     ja: {
       sublbl_ai:               'AIアシスタント · オンライン',
       sublbl_lv:               '担当者 · オンライン',
+      sublbl_lang:             '言語を選択',
       ai_placeholder:          '何でも聴いてください…',
       lv_title:                '担当者に相談する',
       lv_desc:                 '{name}のサポートチームに直接つながり、個別サポートを受けられます。',
@@ -144,6 +149,7 @@
     ko: {
       sublbl_ai:               'AI 어시스턴트 · 온라인',
       sublbl_lv:               '상담원 · 온라인',
+      sublbl_lang:             '언어 선택',
       ai_placeholder:          '무었이든 물어보세요…',
       lv_title:                '실시간 상담원 연결',
       lv_desc:                 '{name} 지원팀과 직접 연결하여 맞춤 도움을 받으세요.',
@@ -165,6 +171,7 @@
     th: {
       sublbl_ai:               'AI · ออนไลน์',
       sublbl_lv:               'เจ้าหน้าที่ · ออนไลน์',
+      sublbl_lang:             'เลือกภาษา',
       ai_placeholder:          'ถามอะไรก็ได้…',
       lv_title:                'พูดคุยกับเจ้าหน้าที่',
       lv_desc:                 'ติดต่อโดยตรงกับทีมสนับสนุน {name} เพื่อรับความช่วยเหลือส่วนตัว',
@@ -186,6 +193,7 @@
     vi: {
       sublbl_ai:               'Trợ lý AI · Trực tuyến',
       sublbl_lv:               'Nhân viên · Trực tuyến',
+      sublbl_lang:             'Chọn ngôn ngữ',
       ai_placeholder:          'Hỏi tôi bất cứ điều gì…',
       lv_title:                'Nói chuyện với nhân viên',
       lv_desc:                 'Kết nối trực tiếp với đội ngũ hỗ trợ {name} để được giúp đỡ cá nhân.',
@@ -207,6 +215,7 @@
     id: {
       sublbl_ai:               'Asisten AI · Online',
       sublbl_lv:               'Agen Langsung · Online',
+      sublbl_lang:             'Pilih Bahasa',
       ai_placeholder:          'Tanyakan apa saja…',
       lv_title:                'Bicara dengan Agen Langsung',
       lv_desc:                 'Terhubung langsung dengan tim dukungan {name} untuk bantuan personal.',
@@ -228,6 +237,7 @@
     fr: {
       sublbl_ai:               "Assistant IA · En ligne",
       sublbl_lv:               "Agent en direct · En ligne",
+      sublbl_lang:             "Choisir la langue",
       ai_placeholder:          "Posez-moi une question…",
       lv_title:                "Parler à un agent",
       lv_desc:                 "Connectez-vous directement avec l'équipe de support {name} pour une aide personnalisée.",
@@ -249,6 +259,7 @@
     es: {
       sublbl_ai:               'Asistente IA · En línea',
       sublbl_lv:               'Agente en vivo · En línea',
+      sublbl_lang:             'Seleccionar idioma',
       ai_placeholder:          'Pregúntame lo que sea…',
       lv_title:                'Hablar con un agente',
       lv_desc:                 'Conéctate directamente con el equipo de soporte de {name} para ayuda personalizada.',
@@ -280,6 +291,13 @@
     return str;
   }
 
+  // ── Language names (shown in their own script) ─────────────────────
+  var LANG_NAMES = {
+    en: 'English', km: 'ខ្មែរ', zh: '中文', ja: '日本語',
+    ko: '한국어',  th: 'ภาษาไทย', vi: 'Tiếng Việt',
+    id: 'Indonesia', fr: 'Français', es: 'Español',
+  };
+
   var G = 'linear-gradient(135deg,' + cfg.colorFrom + ',' + cfg.colorTo + ')';
 
   // ── Styles ────────────────────────────────────────────────────────
@@ -288,11 +306,9 @@
     '#_oc_widget_root{position:fixed;bottom:24px;right:24px;z-index:2147483647;font-family:"Kantumruy Pro","Source Sans 3",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column;align-items:flex-end;gap:12px}' +
     '#_ocw_btn{width:60px;height:60px;border-radius:50%;background:' + G + ';border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(0,0,0,.25);transition:transform .2s}' +
     '#_ocw_btn:hover{transform:scale(1.1)}' +
-    // Panel: header + body side by side
     '#_ocw_panel{display:none;flex-direction:column;width:400px;max-width:calc(100vw - 48px);height:540px;max-height:calc(100vh - 110px);background:#fff;border-radius:20px;box-shadow:0 8px 40px rgba(0,0,0,.18);overflow:hidden}' +
     '#_ocw_panel.open{display:flex;animation:_ocw_in .25s ease}' +
     '@keyframes _ocw_in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}' +
-    // Header
     '#_ocw_hdr{background:' + G + ';padding:13px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0}' +
     '#_ocw_ava{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;color:#fff;flex-shrink:0}' +
     '#_ocw_info{flex:1;min-width:0}' +
@@ -301,45 +317,47 @@
     '#_ocw_sublbl::before{content:"";width:6px;height:6px;background:#4ade80;border-radius:50%;display:inline-block;flex-shrink:0}' +
     '#_ocw_close{background:none;border:none;color:rgba(255,255,255,.75);font-size:22px;cursor:pointer;line-height:1;padding:0 2px;flex-shrink:0}' +
     '#_ocw_close:hover{color:#fff}' +
-    // Body = sidebar + main
+    '#_ocw_hdr_lang{background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:4px;border-radius:8px;flex-shrink:0;transition:all .15s}' +
+    '#_ocw_hdr_lang:hover{color:#fff;background:rgba(255,255,255,.15)}' +
+    '#_ocw_hdr_lang.active{color:#fff;background:rgba(255,255,255,.25)}' +
     '#_ocw_body{display:flex;flex:1;overflow:hidden}' +
-    // Left sidebar
     '#_ocw_sb{width:54px;border-right:1px solid #efefef;display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:2px;background:#f9f9fb;flex-shrink:0;overflow-y:auto}' +
     '._ocw_sbi{width:40px;height:40px;border-radius:11px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#b0b8c4;text-decoration:none;transition:all .15s;position:relative;flex-shrink:0;background:transparent}' +
     '._ocw_sbi:hover{background:#f0f2f5;color:#374151}' +
     '._ocw_sbi.active{background:' + G + ';color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.15)}' +
     '._ocw_sbd{width:30px;height:1px;background:#e8eaed;margin:5px 0;flex-shrink:0}' +
-    // Main content area
     '#_ocw_main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}' +
-    // Messages containers
     '._ocw_msgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;background:#f7f8fc}' +
-    // Bubbles
     '._ocw_bot{background:#fff;color:#1f2937;padding:9px 13px;border-radius:16px 16px 16px 4px;font-size:13px;line-height:1.5;max-width:90%;box-shadow:0 1px 3px rgba(0,0,0,.07);align-self:flex-start}' +
     '._ocw_usr{background:' + G + ';color:#fff;padding:9px 13px;border-radius:16px 16px 4px 16px;font-size:13px;line-height:1.5;max-width:90%;align-self:flex-end}' +
     '._ocw_sys{background:rgba(0,0,0,.05);color:#6b7280;padding:6px 14px;border-radius:20px;font-size:11px;text-align:center;align-self:center;font-weight:500}' +
-    // Typing dots
     '._ocw_dots{display:flex;gap:4px;align-items:center;padding:10px 13px;background:#fff;border-radius:16px 16px 16px 4px;align-self:flex-start;box-shadow:0 1px 3px rgba(0,0,0,.07)}' +
     '._ocw_dots span{width:6px;height:6px;background:#bbb;border-radius:50%;animation:_ocw_dot 1.2s infinite}' +
     '._ocw_dots span:nth-child(2){animation-delay:.2s}._ocw_dots span:nth-child(3){animation-delay:.4s}' +
     '@keyframes _ocw_dot{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}' +
-    // Footer input row
     '._ocw_ftr{display:flex;align-items:center;gap:8px;padding:10px 12px;border-top:1px solid #e8eaed;background:#fff;flex-shrink:0}' +
     '._ocw_inp{flex:1;border:1.5px solid #e5e7eb;border-radius:22px;padding:8px 14px;font-size:13px;outline:none;transition:border .2s;background:#f9fafb;color:#111}' +
     '._ocw_inp:focus{border-color:' + cfg.colorFrom + ';background:#fff}' +
     '._ocw_snd{width:38px;height:38px;border-radius:50%;background:' + G + ';border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}' +
     '._ocw_snd:hover{opacity:.85}._ocw_snd:disabled{opacity:.35;cursor:default}' +
-    // Quick-reply topic chips (compact)
     '._ocw_chips{display:flex;flex-wrap:wrap;gap:5px;padding:5px 12px 8px;background:#f7f8fc;border-top:1px solid #eef0f3}' +
     '._ocw_chip{padding:4px 10px;border-radius:14px;border:1.5px solid ' + cfg.colorFrom + ';color:' + cfg.colorFrom + ';background:#fff;font-size:11px;font-weight:500;cursor:pointer;transition:all .15s;white-space:nowrap;line-height:1.4}' +
     '._ocw_chip:hover{background:' + G + ';color:#fff;border-color:transparent}' +
     '._ocw_chip.active{background:' + G + ';color:#fff;border-color:transparent}' +
-    // Live agent idle card
     '#_ocw_lv_idle{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 24px;text-align:center;gap:14px;background:#f7f8fc}' +
     '#_ocw_lv_idle .lv_ico{width:60px;height:60px;border-radius:50%;background:' + G + ';display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(0,0,0,.15);color:#fff}' +
     '#_ocw_lv_idle h3{font-size:15px;font-weight:700;color:#111827;margin:0}' +
     '#_ocw_lv_idle p{font-size:12px;color:#6b7280;margin:0;line-height:1.6;max-width:220px}' +
     '#_ocw_lv_connect{padding:10px 28px;border-radius:24px;background:' + G + ';border:none;cursor:pointer;color:#fff;font-size:13px;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.15);transition:opacity .15s}' +
-    '#_ocw_lv_connect:hover{opacity:.88}';
+    '#_ocw_lv_connect:hover{opacity:.88}' +
+    // Language panel
+    '#_ocw_lang_panel{flex:1;display:none;flex-direction:column;overflow:hidden;background:#f7f8fc}' +
+    '#_ocw_lang_hdr{padding:14px 16px 10px;border-bottom:1px solid #e8eaed;background:#fff;flex-shrink:0}' +
+    '#_ocw_lang_hdr span{font-size:13px;font-weight:600;color:#374151}' +
+    '#_ocw_lang_list{flex:1;overflow-y:auto;padding:8px 6px}' +
+    '._ocw_lang_opt{width:100%;text-align:left;padding:10px 14px;border:none;border-radius:10px;background:transparent;cursor:pointer;font-size:13px;color:#374151;display:flex;align-items:center;justify-content:space-between;transition:background .12s;font-family:inherit}' +
+    '._ocw_lang_opt:hover{background:#eef0f4}' +
+    '._ocw_lang_opt.active{background:' + G + ';color:#fff;font-weight:600}';
   document.head.appendChild(css);
 
   // ── SVG icons ─────────────────────────────────────────────────────
@@ -348,6 +366,7 @@
   var AI_ICO       = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/></svg>';
   var LIVE_ICO     = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1c-4.97 0-9 4.03-9 9v7c0 1.66 1.34 3 3 3h1v-8H5v-2c0-3.87 3.13-7 7-7s7 3.13 7 7v2h-2v8h1c1.66 0 3-1.34 3-3v-7c0-4.97-4.03-9-9-9z"/></svg>';
   var LIVE_BIG_ICO = '<svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1c-4.97 0-9 4.03-9 9v7c0 1.66 1.34 3 3 3h1v-8H5v-2c0-3.87 3.13-7 7-7s7 3.13 7 7v2h-2v8h1c1.66 0 3-1.34 3-3v-7c0-4.97-4.03-9-9-9z"/></svg>';
+  var LANG_ICO     = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zm6.93 6h-2.95c-.32-1.25-.78-2.45-1.38-3.56 1.84.63 3.37 1.91 4.33 3.56zM12 4.04c.83 1.2 1.48 2.53 1.91 3.96h-3.82c.43-1.43 1.08-2.76 1.91-3.96zM4.26 14C4.1 13.36 4 12.69 4 12s.1-1.36.26-2h3.38c-.08.66-.14 1.32-.14 2s.06 1.34.14 2H4.26zm.82 2h2.95c.32 1.25.78 2.45 1.38 3.56-1.84-.63-3.37-1.9-4.33-3.56zm2.95-8H5.08c.96-1.66 2.49-2.93 4.33-3.56C8.81 5.55 8.35 6.75 8.03 8zM12 19.96c-.83-1.2-1.48-2.53-1.91-3.96h3.82c-.43 1.43-1.08 2.76-1.91 3.96zM14.34 14H9.66c-.09-.66-.16-1.32-.16-2s.07-1.35.16-2h4.68c.09.65.16 1.32.16 2s-.07 1.34-.16 2zm.25 5.56c.6-1.11 1.06-2.31 1.38-3.56h2.95c-.96 1.65-2.49 2.93-4.33 3.56zM16.36 14c.08-.66.14-1.32.14-2s-.06-1.34-.14-2h3.38c.16.64.26 1.31.26 2s-.1 1.36-.26 2h-3.38z"/></svg>';
   var MSG_ICO      = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 4.974 0 11.111c0 3.498 1.744 6.614 4.469 8.654V24l4.088-2.242c1.092.301 2.246.464 3.443.464 6.627 0 12-4.975 12-11.111S18.627 0 12 0zm1.191 14.963l-3.055-3.26-5.963 3.26L10.732 8l3.131 3.26L19.752 8l-6.561 6.963z"/></svg>';
   var WA_ICO       = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>';
   var TG_ICO       = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>';
@@ -364,6 +383,15 @@
     return base + v;
   }
 
+  // ── Build language option list ─────────────────────────────────────
+  var langOptsHTML = Object.keys(LANG_NAMES).map(function (code) {
+    var isActive = code === lang;
+    return '<button class="_ocw_lang_opt' + (isActive ? ' active' : '') + '" data-lang="' + code + '">' +
+      LANG_NAMES[code] +
+      (isActive ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>' : '') +
+      '</button>';
+  }).join('');
+
   // ── Build sidebar ─────────────────────────────────────────────────
   var sbHTML =
     '<div id="_ocw_sb">' +
@@ -378,6 +406,7 @@
   if (cfg.instagram)  chHTML += '<a class="_ocw_sbi" href="' + normalizeUrl(cfg.instagram, 'https://ig.me/m/')         + '" target="_blank" rel="noopener" title="Instagram">'  + IG_ICO  + '</a>';
   if (cfg.email)      chHTML += '<a class="_ocw_sbi" href="' + normalizeUrl(cfg.email,     'mailto:')                  + '" rel="noopener" title="Email">'                       + EM_ICO  + '</a>';
   if (chHTML) sbHTML += '<div class="_ocw_sbd"></div>' + chHTML;
+
   sbHTML += '</div>';
 
   // ── DOM ───────────────────────────────────────────────────────────
@@ -391,6 +420,7 @@
           '<strong>' + cfg.name + '</strong>' +
           '<div id="_ocw_sublbl">' + t('sublbl_ai') + '</div>' +
         '</div>' +
+        '<button id="_ocw_hdr_lang" title="Language">' + LANG_ICO + '</button>' +
         '<button id="_ocw_close" title="Close">&times;</button>' +
       '</div>' +
       '<div id="_ocw_body">' +
@@ -409,14 +439,12 @@
 
           // ── Live Agent panel ───────────────────────────────────
           '<div id="_ocw_lv" style="display:none;flex:1;flex-direction:column;overflow:hidden">' +
-            // Idle / connect card
             '<div id="_ocw_lv_idle" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 24px;text-align:center;gap:14px;background:#f7f8fc">' +
               '<div class="lv_ico">' + LIVE_BIG_ICO + '</div>' +
-              '<h3 style="font-size:15px;font-weight:700;color:#111827;margin:0">' + t('lv_title') + '</h3>' +
-              '<p style="font-size:12px;color:#6b7280;margin:0;line-height:1.6;max-width:200px">' + t('lv_desc', { name: cfg.name }) + '</p>' +
+              '<h3 id="_ocw_lv_title" style="font-size:15px;font-weight:700;color:#111827;margin:0">' + t('lv_title') + '</h3>' +
+              '<p id="_ocw_lv_desc" style="font-size:12px;color:#6b7280;margin:0;line-height:1.6;max-width:200px">' + t('lv_desc', { name: cfg.name }) + '</p>' +
               '<button id="_ocw_lv_connect">' + t('lv_connect') + '</button>' +
             '</div>' +
-            // Live chat area (shown after connecting)
             '<div id="_ocw_lv_chat" style="display:none;flex:1;flex-direction:column;overflow:hidden">' +
               '<div id="_ocw_lv_msgs" class="_ocw_msgs"></div>' +
               '<div class="_ocw_ftr">' +
@@ -424,6 +452,12 @@
                 '<button id="_ocw_lv_snd" class="_ocw_snd" disabled>' + SEND_ICO + '</button>' +
               '</div>' +
             '</div>' +
+          '</div>' +
+
+          // ── Language selector panel ────────────────────────────
+          '<div id="_ocw_lang_panel">' +
+            '<div id="_ocw_lang_hdr"><span id="_ocw_lang_title">' + t('sublbl_lang') + '</span></div>' +
+            '<div id="_ocw_lang_list">' + langOptsHTML + '</div>' +
           '</div>' +
 
         '</div>' +
@@ -437,6 +471,7 @@
   var sublbl     = document.getElementById('_ocw_sublbl');
   var isOpen     = false;
   var activeTab  = 'ai';
+  var prevTab    = 'ai';   // tab to return to after language selection
 
   // AI
   var aiPanel    = document.getElementById('_ocw_ai');
@@ -447,7 +482,7 @@
   var aiHistory  = [];
   var lastQ      = '';
   var aiStarted  = false;
-  var pendingTopics = null;   // topics fetched but waiting for greeting to finish
+  var pendingTopics = null;
 
   // Live
   var lvPanel    = document.getElementById('_ocw_lv');
@@ -456,12 +491,19 @@
   var lvMsgs     = document.getElementById('_ocw_lv_msgs');
   var lvInp      = document.getElementById('_ocw_lv_inp');
   var lvSnd      = document.getElementById('_ocw_lv_snd');
-  var liveStep      = 'idle';   // 'idle' | 'collect_name' | 'collect_contact' | 'connecting' | 'connected'
+  var lvTitleEl  = document.getElementById('_ocw_lv_title');
+  var lvDescEl   = document.getElementById('_ocw_lv_desc');
+  var lvConnectEl = document.getElementById('_ocw_lv_connect');
+  var liveStep      = 'idle';
   var liveChatId    = null;
   var pollSince     = null;
   var pollTimer     = null;
   var visitorName   = '';
   var visitorContact = '';
+
+  // Language panel
+  var langPanel  = document.getElementById('_ocw_lang_panel');
+  var langTitle  = document.getElementById('_ocw_lang_title');
 
   // ── Helpers ───────────────────────────────────────────────────────
   function msgEl(text, isUser) {
@@ -500,11 +542,11 @@
   function addLvSys(text) { appendScroll(lvMsgs, sysEl(text)); }
 
   function showDots(container) {
-    var t = document.createElement('div');
-    t.className = '_ocw_dots';
-    t.innerHTML = '<span></span><span></span><span></span>';
-    appendScroll(container, t);
-    return t;
+    var td = document.createElement('div');
+    td.className = '_ocw_dots';
+    td.innerHTML = '<span></span><span></span><span></span>';
+    appendScroll(container, td);
+    return td;
   }
   function rmDots(el) { if (el && el.parentNode) el.parentNode.removeChild(el); }
 
@@ -513,9 +555,54 @@
     setTimeout(function () { rmDots(td); appendScroll(container, msgEl(text, false)); if (cb) cb(); }, 750);
   }
 
+  // ── Language switcher ─────────────────────────────────────────────
+  function changeLang(code) {
+    lang = code;
+
+    // Update header sublbl based on which content tab is active
+    sublbl.textContent = t(prevTab === 'lv' ? 'sublbl_lv' : 'sublbl_ai');
+
+    // Update AI input placeholder
+    aiInp.placeholder = t('ai_placeholder');
+
+    // Update live input placeholder based on current step
+    if (liveStep === 'collect_name') {
+      lvInp.placeholder = t('lv_placeholder_name');
+    } else if (liveStep === 'collect_contact') {
+      lvInp.placeholder = t('lv_placeholder_contact');
+    } else if (liveStep === 'failed') {
+      lvInp.placeholder = t('retry_placeholder');
+    } else {
+      lvInp.placeholder = t('lv_placeholder_agent');
+    }
+
+    // Update live-agent idle card
+    lvTitleEl.textContent = t('lv_title');
+    lvDescEl.textContent  = t('lv_desc', { name: cfg.name });
+    lvConnectEl.textContent = t('lv_connect');
+
+    // Update lang panel header
+    langTitle.textContent = t('sublbl_lang');
+
+    // Refresh checkmarks on lang options
+    var opts = document.querySelectorAll('._ocw_lang_opt');
+    var CHECK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+    opts.forEach(function (btn) {
+      var isNow = btn.getAttribute('data-lang') === lang;
+      btn.classList.toggle('active', isNow);
+      // Remove old check then add if active
+      var existing = btn.querySelector('svg');
+      if (existing) btn.removeChild(existing);
+      if (isNow) btn.insertAdjacentHTML('beforeend', CHECK);
+    });
+
+    // Return to the tab the user was on before opening language picker
+    switchTab(prevTab);
+  }
+
   // ── Topic chips ───────────────────────────────────────────────────
-  var widgetTopics  = [];   // [{label, content}]
-  var activeChipEl  = null; // currently highlighted chip button
+  var widgetTopics  = [];
+  var activeChipEl  = null;
 
   function showChips(topics) {
     if (!topics || !topics.length) return;
@@ -530,27 +617,20 @@
       btn.className = '_ocw_chip';
       btn.textContent = label;
       btn.addEventListener('click', function () {
-        // Highlight selected chip
         if (activeChipEl) activeChipEl.classList.remove('active');
         activeChipEl = btn;
         btn.classList.add('active');
-
-        // Show the user's selection as a bubble
         addAiMsg(label, true);
-
-        // Show content directly from business context — NO AI call, NO escalation
         var answer = content || null;
         var dots = showDots(aiMsgs);
         setTimeout(function () {
           rmDots(dots);
           var reply = answer || t('chip_fallback', { topic: label });
           appendScroll(aiMsgs, msgEl(reply, false));
-          // Keep in history so follow-up questions have context
           aiHistory.push({ role: 'user',      content: label });
           aiHistory.push({ role: 'assistant', content: reply });
           if (aiHistory.length > 20) aiHistory = aiHistory.slice(-20);
         }, 400);
-        // Chips stay visible — user can keep exploring
       });
       row.appendChild(btn);
     });
@@ -573,11 +653,7 @@
       .then(function (data) {
         var topics = data.topics || [];
         if (!topics.length) return;
-        if (aiStarted) {
-          showChips(topics);
-        } else {
-          pendingTopics = topics;
-        }
+        if (aiStarted) { showChips(topics); } else { pendingTopics = topics; }
       })
       .catch(function () {});
   }
@@ -587,13 +663,17 @@
     activeTab = tab;
     document.getElementById('_ocw_tab_ai').classList.toggle('active', tab === 'ai');
     document.getElementById('_ocw_tab_lv').classList.toggle('active', tab === 'lv');
-    aiPanel.style.display = tab === 'ai' ? 'flex' : 'none';
-    lvPanel.style.display = tab === 'lv' ? 'flex' : 'none';
+    document.getElementById('_ocw_hdr_lang').classList.toggle('active', tab === 'lang');
+    aiPanel.style.display       = tab === 'ai'   ? 'flex' : 'none';
+    lvPanel.style.display       = tab === 'lv'   ? 'flex' : 'none';
+    langPanel.style.display     = tab === 'lang' ? 'flex' : 'none';
 
     if (tab === 'ai') {
+      prevTab = 'ai';
       sublbl.textContent = t('sublbl_ai');
       if (!aiInp.disabled) aiInp.focus();
-    } else {
+    } else if (tab === 'lv') {
+      prevTab = 'lv';
       sublbl.textContent = t('sublbl_lv');
       if (liveStep === 'idle' && cfg.api) {
         autoConnect();
@@ -601,6 +681,8 @@
         if (!lvInp.disabled) lvInp.focus();
         if (!pollTimer) startPolling();
       }
+    } else if (tab === 'lang') {
+      sublbl.textContent = t('sublbl_lang');
     }
   }
 
@@ -625,7 +707,7 @@
   }
   function stopPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
 
-  // ── Live connect: start collection flow ──────────────────────────
+  // ── Live connect flow ─────────────────────────────────────────────
   function autoConnect() {
     if (liveStep !== 'idle') return;
     liveStep = 'collect_name';
@@ -684,17 +766,10 @@
     });
   }
 
-  // ── Send live message (handles collection steps + live chat) ─────
   function sendLive() {
     var txt = lvInp.value.trim();
     if (lvInp.disabled) return;
-
-    // Retry connection with already-collected info (no re-collection needed)
-    if (liveStep === 'failed') {
-      doConnect();
-      return;
-    }
-
+    if (liveStep === 'failed') { doConnect(); return; }
     if (!txt) return;
     addLvMsg(txt, true);
     lvInp.value = '';
@@ -708,14 +783,12 @@
       });
       return;
     }
-
     if (liveStep === 'collect_contact') {
       visitorContact = txt;
       lvInp.placeholder = t('lv_placeholder_agent');
       doConnect();
       return;
     }
-
     if (liveStep === 'connected' && liveChatId && cfg.api) {
       fetch(cfg.api + '/live-chat', {
         method: 'POST',
@@ -733,10 +806,7 @@
     aiInp.value = '';
     lastQ = txt;
 
-    if (!cfg.api) {
-      botSay(aiMsgs, t('no_api'), null);
-      return;
-    }
+    if (!cfg.api) { botSay(aiMsgs, t('no_api'), null); return; }
 
     aiInp.disabled = true;
     aiSnd.disabled = true;
@@ -759,9 +829,6 @@
       aiInp.disabled = false;
       aiSnd.disabled = false;
       if (data.collect_info) {
-        aiInp.disabled = false;
-        aiSnd.disabled = false;
-        // Auto-switch to live agent tab to begin collection
         setTimeout(function () { switchTab('lv'); }, 900);
       } else {
         aiInp.focus();
@@ -780,15 +847,13 @@
     isOpen = !isOpen;
     panel.classList.toggle('open', isOpen);
     if (isOpen) {
-      // Show AI greeting on first open
       if (!aiStarted && activeTab === 'ai') {
         aiStarted = true;
-        fetchTopics();   // start fetching in parallel
+        fetchTopics();
         botSay(aiMsgs, t('greeting', { name: cfg.name }), function () {
           aiInp.disabled = false;
           aiSnd.disabled = false;
           aiInp.focus();
-          // Show chips that arrived while greeting was animating
           if (pendingTopics) { showChips(pendingTopics); pendingTopics = null; }
         });
       } else if (activeTab === 'ai' && !aiInp.disabled) {
@@ -805,9 +870,16 @@
   document.getElementById('_ocw_close').addEventListener('click', toggle);
   document.getElementById('_ocw_tab_ai').addEventListener('click', function () { switchTab('ai'); });
   document.getElementById('_ocw_tab_lv').addEventListener('click', function () { switchTab('lv'); });
+  document.getElementById('_ocw_hdr_lang').addEventListener('click', function () { switchTab('lang'); });
   document.getElementById('_ocw_lv_connect').addEventListener('click', function () { if (cfg.api) autoConnect(); });
   aiSnd.addEventListener('click', function () { hideChips(); sendAi(); });
   aiInp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { hideChips(); sendAi(); } });
   lvSnd.addEventListener('click', sendLive);
   lvInp.addEventListener('keydown', function (e) { if (e.key === 'Enter') sendLive(); });
+
+  // Language option clicks (delegated to the list container)
+  document.getElementById('_ocw_lang_list').addEventListener('click', function (e) {
+    var btn = e.target.closest('._ocw_lang_opt');
+    if (btn) changeLang(btn.getAttribute('data-lang'));
+  });
 })();
