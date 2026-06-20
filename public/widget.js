@@ -595,10 +595,12 @@
       if (isNow) btn.insertAdjacentHTML('beforeend', CHECK);
     });
 
-    // Re-render greeting in new language if no user messages yet
-    if (aiStarted && aiHistory.length === 0) {
+    // Always reset AI chat so greeting and all replies appear in the new language
+    if (aiStarted) {
       var savedTopics = widgetTopics.slice();
       aiMsgs.innerHTML = '';
+      aiHistory = [];
+      lastQ = '';
       hideChips();
       aiInp.disabled = true;
       aiSnd.disabled = true;
