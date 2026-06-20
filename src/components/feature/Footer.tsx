@@ -15,9 +15,10 @@ export default function Footer() {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
           email,
-          _subject:  "New OPSConnect Newsletter Subscriber",
-          _captcha:  "false",
-          _template: "table",
+          _subject:       "New OPSConnect Newsletter Subscriber",
+          _captcha:       "false",
+          _template:      "table",
+          _autoresponse:  "Thank you for subscribing to OPSConnect! 🎉\n\nYou're now on the list to receive our latest updates, new features, and news. Stay tuned!\n\n— The OPSConnect Team",
         }).toString(),
       });
       setSubmitted(true);
