@@ -34,12 +34,12 @@ export default function Navbar() {
   const isPartner = session?.role === "partner";
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-[#0e2044]/80 backdrop-blur-md border-b border-white/10">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-primary-950/95 backdrop-blur-md border-b border-accent-400/20 shadow-[0_18px_45px_rgba(11,20,40,0.18)]">
       <div className="flex items-center justify-between h-16 md:h-18 px-4 md:px-6">
         <Link to="/" className="flex items-center gap-2 flex-shrink-0">
           <img src="/logo.svg" alt="OPSConnect" className="h-8 md:h-9 w-auto" />
-          <span className="font-heading text-xl md:text-2xl font-bold tracking-tight select-none">
-            <span style={{ color: '#29B4EC' }}>OPS</span>
+          <span className="font-heading text-xl md:text-2xl font-extrabold tracking-tight select-none">
+            <span style={{ color: '#38BDEB' }}>OPS</span>
             <span style={{ color: '#ffffff' }}>Connect</span>
           </span>
         </Link>
@@ -105,13 +105,13 @@ export default function Navbar() {
                     {session.partnerName.slice(0, 2).toUpperCase()}
                   </span>
                 </div>
-                <span className="text-xs font-medium text-foreground-600 max-w-[120px] truncate">
+                <span className="text-xs font-medium text-white/75 max-w-[120px] truncate">
                   {session.partnerName}
                 </span>
               </div>
               <button
                 onClick={handleSignOut}
-                className="text-xs font-medium text-foreground-500 hover:text-foreground-800 transition-colors px-3 py-2 cursor-pointer"
+                className="text-xs font-medium text-white/60 hover:text-white transition-colors px-3 py-2 cursor-pointer"
               >
                 <i className="ri-logout-box-line mr-1"></i>Sign out
               </button>

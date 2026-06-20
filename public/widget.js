@@ -6,9 +6,10 @@
  *     data-partner-id="PART-XXXX-XXXX"
  *     data-name="Your Business"
  *     data-avatar="YB"
- *     data-color-from="#0099FF"
- *     data-color-to="#A033FF"
+ *     data-color-from="#24396D"
+ *     data-color-to="#38BDEB"
  *     data-api="https://<project>.supabase.co/functions/v1"
+ *     data-lang="km"
  *     data-messenger="https://m.me/yourpage"
  *     data-whatsapp="1234567890"
  *     data-telegram="yourusername"
@@ -16,6 +17,9 @@
  *     data-instagram="yourusername"
  *     data-email="hello@yourbusiness.com">
  *   </script>
+ *
+ *  data-lang is optional — auto-detected from browser language if omitted.
+ *  Supported: en, km, zh, ja, ko, th, vi, id, fr, es
  */
 (function () {
   if (document.getElementById('_oc_widget_root')) return;
@@ -35,9 +39,10 @@
     partnerId:  attr('partner-id',  ''),
     name:       attr('name',        'Support'),
     avatar:     attr('avatar',      '?'),
-    colorFrom:  attr('color-from',  '#0099FF'),
-    colorTo:    attr('color-to',    '#A033FF'),
+    colorFrom:  attr('color-from',  '#24396D'),
+    colorTo:    attr('color-to',    '#38BDEB'),
     api:        attr('api',         ''),
+    lang:       attr('lang',        ''),
     messenger:  attr('messenger',   ''),
     whatsapp:   attr('whatsapp',    ''),
     telegram:   attr('telegram',    ''),
@@ -46,12 +51,241 @@
     email:      attr('email',       ''),
   };
 
+  // ── Language detection ─────────────────────────────────────────────
+  var rawLang = cfg.lang || (navigator.language || 'en');
+  var lang = rawLang.toLowerCase().split('-')[0];
+
+  // ── Translations ───────────────────────────────────────────────────
+  var T = {
+    en: {
+      sublbl_ai:               'AI Assistant · Online now',
+      sublbl_lv:               'Live Agent · Online now',
+      ai_placeholder:          'Ask me anything…',
+      lv_title:                'Talk to a Live Agent',
+      lv_desc:                 'Connect directly with the {name} support team for personalized help.',
+      lv_connect:              'Connect Now',
+      lv_placeholder_name:     'Your name…',
+      lv_placeholder_contact:  'Email or phone…',
+      lv_placeholder_agent:    'Message the agent…',
+      ask_name:                'Sure! Before connecting you, may I have your name?',
+      ask_contact:             'Thanks, {name}! What\'s your email address or phone number so the agent can follow up with you?',
+      connecting:              'Connecting you to a live agent…',
+      connected:               '✅ Connected! A support agent will reply here shortly.',
+      connect_failed:          'Could not connect right now. Press Send to try again.',
+      retry_placeholder:       'Press Send to retry…',
+      greeting:                'Hi there! 👋 I\'m {name}\'s AI assistant. How can I help you today?',
+      error:                   'Sorry, I\'m having trouble right now. Please try again or use the channel links.',
+      no_api:                  'Please reach out via the channel icons in the sidebar!',
+      chip_fallback:           'Here is the information about {topic}. For more details please type your question below.',
+    },
+    km: {
+      sublbl_ai:               'AI · អនលឹញ',
+      sublbl_lv:               'ភ្នាក្ងារ · អនលឹញ',
+      ai_placeholder:          'សួរខ្ញុមអ្វីក្តាន…',
+      lv_title:                'ពិគ្រើេជាមន្រភ្នាក្ងារ',
+      lv_desc:                 'ភ្ជាបតំនាកតំញជាមក្រុមផ្តល់ជំនួយ {name}។',
+      lv_connect:              'ភ្ជាបអឹលួវ',
+      lv_placeholder_name:     'អ្នករបស់អ្នក…',
+      lv_placeholder_contact:  'អ៊ឹមែល មើ តូរស័ព្ទ…',
+      lv_placeholder_agent:    'ផ្ញើសារតឹកភ្នាក្ងារ…',
+      ask_name:                'បានហើយ! មុននឹងភ្ជាបអ្នក តើលខ្ញុមអាចត្រឹមអ្នកបានតើ?',
+      ask_contact:             'អរគុណ {name}! សូមផ្តល់អ៊ឹមែល មើ លើខតូរស័ព្ទ តើភ្នាក្ងារអាចតំនាកតំញមកវិញ?',
+      connecting:              'កំពុងភ្ជាបជាមភ្នាក្ងារ…',
+      connected:               '✅ ភ្ជាបជោកជ័យ! ភ្នាក្ងារនឹងឆឹលើយក្នុងពេលខ្លី៦ស។',
+      connect_failed:          'មិនអាចភ្ជាបបានពេលនើ។ ចុចផ្ញើតើព្យាយម័តទីទៀត…',
+      retry_placeholder:       'ចុចផ្ញើតើព្យាយម័តទីទៀត…',
+      greeting:                'សួស្តី! 👋 ខ្ញុមជា AI Assistant របស់ {name}។ តើលខ្ញុមអាចជួយអ្នកបាន\u178tូចម័ត\u178tើ?',
+      error:                   'សូមអភ័យតុស! មានបញ្ហាបច្តើកតើព។ សូមព្យាយម័តទីតើ មើប្រើបតំនញខ្វាក្នុងជ្រុង។',
+      no_api:                  'សូមតំនាកតំញតាមរយេរូបតំណាងបណ័តាញក្នុងប្រអប់ចាមខ្ញ្ង!',
+      chip_fallback:           'នើេជាពឺតឺមានអម្ពី {topic}។ សម្រាបពឺតឺមានបន្■ើម សូមវាយសំណួររបស់អ្នកភ្ញើម័ភាគក្រេម។',
+    },
+    zh: {
+      sublbl_ai:               'AI 助手 · 在线',
+      sublbl_lv:               '在线客服 · 在线',
+      ai_placeholder:          '有什么可以帮您…',
+      lv_title:                '联系人工客服',
+      lv_desc:                 '直接与 {name} 支持团队联系，获得个性化帮助。',
+      lv_connect:              '立即连接',
+      lv_placeholder_name:     '您的姓名…',
+      lv_placeholder_contact:  '电子邮件或电话…',
+      lv_placeholder_agent:    '向客服发送消息…',
+      ask_name:                '好的！连接之前，请问您的姓名是？',
+      ask_contact:             '谢谢，{name}！请提供您的电子邮件或电话，以便客服跟进。',
+      connecting:              '正在连接人工客服…',
+      connected:               '✅ 已连接！客服人员将很快回复您。',
+      connect_failed:          '当前无法连接。请按发送重试。',
+      retry_placeholder:       '按发送重试…',
+      greeting:                '您好！👋 我是 {name} 的 AI 助手，有什么可以帮您？',
+      error:                   '抱歉，目前遇到了一些问题。请重试或使用频道链接。',
+      no_api:                  '请通过左侧栏的频道图标联系我们！',
+      chip_fallback:           '以下是关于 {topic} 的信息。如需了解更多，请在下方输入您的问题。',
+    },
+    ja: {
+      sublbl_ai:               'AIアシスタント · オンライン',
+      sublbl_lv:               '担当者 · オンライン',
+      ai_placeholder:          '何でも聴いてください…',
+      lv_title:                '担当者に相談する',
+      lv_desc:                 '{name}のサポートチームに直接つながり、個別サポートを受けられます。',
+      lv_connect:              '今すぐつながる',
+      lv_placeholder_name:     'お名前…',
+      lv_placeholder_contact:  'メールまたは電話番号…',
+      lv_placeholder_agent:    'エージェントにメッセージ…',
+      ask_name:                '承知しました！つなぐ前に、お名前を教えていただけますか？',
+      ask_contact:             'ありがとうございます、{name}さん！担当者がご連絡できるよう、メールアドレスまたは電話番号を教えてください。',
+      connecting:              '担当者につないでいます…',
+      connected:               '✅ 接続しました！担当者がすぐに返答いたします。',
+      connect_failed:          '現在つなげません。送信ボタンを押して再試行してください。',
+      retry_placeholder:       '送信ボタンで再試行…',
+      greeting:                'こんにちは！👋 {name}のAIアシスタントです。何かお手伝いできますか？',
+      error:                   '申し訳ございません、現在問題が発生しています。再試行するか、チャンネルリンクをご利用ください。',
+      no_api:                  'サイドバーのチャンネルアイコンからお問い合わせください！',
+      chip_fallback:           '{topic}に関する情報です。詳細については、下に質問を入力してください。',
+    },
+    ko: {
+      sublbl_ai:               'AI 어시스턴트 · 온라인',
+      sublbl_lv:               '상담원 · 온라인',
+      ai_placeholder:          '무었이든 물어보세요…',
+      lv_title:                '실시간 상담원 연결',
+      lv_desc:                 '{name} 지원팀과 직접 연결하여 맞춤 도움을 받으세요.',
+      lv_connect:              '지금 연결하기',
+      lv_placeholder_name:     '이름을 입력하세요…',
+      lv_placeholder_contact:  '이메일 또는 전화번호…',
+      lv_placeholder_agent:    '상담원에게 메시지 보내기…',
+      ask_name:                '알겠습니다! 연결하기 전에 성함을 알 수 있을까요?',
+      ask_contact:             '감사합니다, {name}님! 상담원이 연락드릴 수 있도록 이메일 또는 전화번호를 알려주세요.',
+      connecting:              '상담원과 연결 중…',
+      connected:               '✅ 연결되었습니다! 상담원이 곳 답변드립니다.',
+      connect_failed:          '현재 연결할 수 없습니다. 전송 버튼을 눌러 다시 시도하세요.',
+      retry_placeholder:       '전송 버튼으로 재시도…',
+      greeting:                '안녕하세요! 👋 {name}의 AI 어시스턴트입니다. 무었을 도와드릴까요?',
+      error:                   '죄송합니다, 현재 문제가 발생했습니다. 다시 시도하거나 채널 링크를 이용해 주세요.',
+      no_api:                  '사이드바의 채널 아이콘을 통해 문의해 주세요!',
+      chip_fallback:           '{topic}에 대한 정보입니다. 자세한 내용은 아래에 질문을 입력하세요.',
+    },
+    th: {
+      sublbl_ai:               'AI · ออนไลน์',
+      sublbl_lv:               'เจ้าหน้าที่ · ออนไลน์',
+      ai_placeholder:          'ถามอะไรก็ได้…',
+      lv_title:                'พูดคุยกับเจ้าหน้าที่',
+      lv_desc:                 'ติดต่อโดยตรงกับทีมสนับสนุน {name} เพื่อรับความช่วยเหลือส่วนตัว',
+      lv_connect:              'เชื่อมต่อเดี๋ยวนี้',
+      lv_placeholder_name:     'ชื่อของคุณ…',
+      lv_placeholder_contact:  'อีเมลหรือเบอร์โทร…',
+      lv_placeholder_agent:    'ส่งข้อความถึงเจ้าหน้าที่…',
+      ask_name:                'ได้เลย! ก่อนเชื่อมต่อ ขอทราบชื่อของคุณได้ไหม?',
+      ask_contact:             'ขอบคุณ {name}! กรุณาให้อีเมลหรือเบอร์โทรศัพท์ เพื่อให้เจ้าหน้าที่ติดต่อกลับ',
+      connecting:              'กำลังเชื่อมต่อกับเจ้าหน้าที่…',
+      connected:               '✅ เชื่อมต่อแล้ว! เจ้าหน้าที่จะตอบกลับในไม่ช้า',
+      connect_failed:          'ไม่สามารถเชื่อมต่อได้ในขณะนี้ กดส่งเพื่อลองใหม่',
+      retry_placeholder:       'กดส่งเพื่อลองใหม่…',
+      greeting:                'สวัสดี! 👋 ฉันคือ AI Assistant ของ {name} มีอะไรให้ช่วยไหม?',
+      error:                   'ขอโทษ ขณะนี้มีปัญหาทางเทคนิค กรุณาลองใหม่หรือใช้ลิงก์ช่องทาง',
+      no_api:                  'กรุณาติดต่อผ่านไอคอนช่องทางในแถบด้านข้าง!',
+      chip_fallback:           'นี่คือข้อมูลเกี่ยวกับ {topic} สำหรับรายละเอียดเพิ่มเติม กรุณาพิมพ์คำถามด้านล่าง',
+    },
+    vi: {
+      sublbl_ai:               'Trợ lý AI · Trực tuyến',
+      sublbl_lv:               'Nhân viên · Trực tuyến',
+      ai_placeholder:          'Hỏi tôi bất cứ điều gì…',
+      lv_title:                'Nói chuyện với nhân viên',
+      lv_desc:                 'Kết nối trực tiếp với đội ngũ hỗ trợ {name} để được giúp đỡ cá nhân.',
+      lv_connect:              'Kết nối ngay',
+      lv_placeholder_name:     'Tên của bạn…',
+      lv_placeholder_contact:  'Email hoặc số điện thoại…',
+      lv_placeholder_agent:    'Nhắn tin cho nhân viên…',
+      ask_name:                'Được rồi! Trước khi kết nối, tôi có thể biết tên bạn không?',
+      ask_contact:             'Cảm ơn {name}! Bạn có thể cho địa chỉ email hoặc số điện thoại để nhân viên liên hệ lại không?',
+      connecting:              'Đang kết nối với nhân viên…',
+      connected:               '✅ Đã kết nối! Nhân viên sẽ trả lời bạn trong giây lát.',
+      connect_failed:          'Không thể kết nối lúc này. Nhấn Gửi để thử lại.',
+      retry_placeholder:       'Nhấn Gửi để thử lại…',
+      greeting:                'Xin chào! 👋 Tôi là trợ lý AI của {name}. Tôi có thể giúp gì cho bạn?',
+      error:                   'Xin lỗi, tôi đang gặp sự cố. Vui lòng thử lại hoặc sử dụng các liên kết kênh.',
+      no_api:                  'Vui lòng liên hệ qua các biểu tượng kênh ở thanh bên!',
+      chip_fallback:           'Đây là thông tin về {topic}. Để biết thêm chi tiết, hãy nhập câu hỏi của bạn bên dưới.',
+    },
+    id: {
+      sublbl_ai:               'Asisten AI · Online',
+      sublbl_lv:               'Agen Langsung · Online',
+      ai_placeholder:          'Tanyakan apa saja…',
+      lv_title:                'Bicara dengan Agen Langsung',
+      lv_desc:                 'Terhubung langsung dengan tim dukungan {name} untuk bantuan personal.',
+      lv_connect:              'Hubungkan Sekarang',
+      lv_placeholder_name:     'Nama Anda…',
+      lv_placeholder_contact:  'Email atau nomor telepon…',
+      lv_placeholder_agent:    'Pesan untuk agen…',
+      ask_name:                'Baik! Sebelum menghubungkan Anda, boleh saya tahu nama Anda?',
+      ask_contact:             'Terima kasih, {name}! Apa alamat email atau nomor telepon Anda agar agen dapat menghubungi Anda?',
+      connecting:              'Menghubungkan Anda ke agen langsung…',
+      connected:               '✅ Terhubung! Agen akan membalas sebentar lagi.',
+      connect_failed:          'Tidak dapat terhubung sekarang. Tekan Kirim untuk mencoba lagi.',
+      retry_placeholder:       'Tekan Kirim untuk mencoba lagi…',
+      greeting:                'Halo! 👋 Saya asisten AI dari {name}. Bagaimana saya bisa membantu Anda?',
+      error:                   'Maaf, saya sedang mengalami masalah. Silakan coba lagi atau gunakan tautan saluran.',
+      no_api:                  'Silakan hubungi melalui ikon saluran di bilah samping!',
+      chip_fallback:           'Berikut adalah informasi tentang {topic}. Untuk detail lebih lanjut, ketik pertanyaan Anda di bawah.',
+    },
+    fr: {
+      sublbl_ai:               'Assistant IA · En ligne',
+      sublbl_lv:               'Agent en direct · En ligne',
+      ai_placeholder:          'Posez-moi une question…',
+      lv_title:                'Parler à un agent',
+      lv_desc:                 'Connectez-vous directement avec l’équipe de support {name} pour une aide personnalisée.',
+      lv_connect:              'Se connecter maintenant',
+      lv_placeholder_name:     'Votre nom…',
+      lv_placeholder_contact:  'E-mail ou téléphone…',
+      lv_placeholder_agent:    'Message à l’agent…',
+      ask_name:                'Bien sûr ! Avant de vous connecter, puis-je avoir votre nom ?',
+      ask_contact:             'Merci, {name} ! Quelle est votre adresse e-mail ou votre numéro de téléphone ?',
+      connecting:              'Connexion à un agent en direct…',
+      connected:               '✅ Connecté ! Un agent vous répondra sous peu.',
+      connect_failed:          'Impossible de se connecter pour le moment. Appuyez sur Envoyer pour réessayer.',
+      retry_placeholder:       'Appuyez sur Envoyer pour réessayer…',
+      greeting:                'Bonjour ! 👋 Je suis l’assistant IA de {name}. Comment puis-je vous aider ?',
+      error:                   'Désolé, je rencontre des difficultés. Veuillez réessayer ou utiliser les liens de canaux.',
+      no_api:                  'Veuillez nous contacter via les icônes de canaux dans la barre latérale !',
+      chip_fallback:           'Voici les informations sur {topic}. Pour plus de détails, saisissez votre question ci-dessous.',
+    },
+    es: {
+      sublbl_ai:               'Asistente IA · En línea',
+      sublbl_lv:               'Agente en vivo · En línea',
+      ai_placeholder:          'Pregúntame lo que sea…',
+      lv_title:                'Hablar con un agente',
+      lv_desc:                 'Conéctate directamente con el equipo de soporte de {name} para ayuda personalizada.',
+      lv_connect:              'Conectar ahora',
+      lv_placeholder_name:     'Tu nombre…',
+      lv_placeholder_contact:  'Correo o teléfono…',
+      lv_placeholder_agent:    'Mensaje al agente…',
+      ask_name:                '¡Claro! Antes de conectarte, ¿puedo saber tu nombre?',
+      ask_contact:             '¡Gracias, {name}! ¿Cuál es tu correo electrónico o número de teléfono para que el agente pueda contactarte?',
+      connecting:              'Conectándote con un agente en vivo…',
+      connected:               '✅ ¡Conectado! Un agente te responderá en breve.',
+      connect_failed:          'No se puede conectar ahora. Presiona Enviar para intentarlo de nuevo.',
+      retry_placeholder:       'Presiona Enviar para reintentar…',
+      greeting:                '¡Hola! 👋 Soy el asistente de IA de {name}. ¿En qué puedo ayudarte?',
+      error:                   'Lo siento, estoy teniendo problemas ahora mismo. Inténtalo de nuevo o usa los enlaces de canales.',
+      no_api:                  '¡Por favor, contáctanos mediante los iconos de canales en la barra lateral!',
+      chip_fallback:           'Aquí está la información sobre {topic}. Para más detalles, escribe tu pregunta a continuación.',
+    },
+  };
+
+  function t(key, vars) {
+    var locale = T[lang] ? lang : 'en';
+    var str = (T[locale] && T[locale][key]) || T['en'][key] || key;
+    if (vars) {
+      Object.keys(vars).forEach(function (k) {
+        str = str.split('{' + k + '}').join(vars[k]);
+      });
+    }
+    return str;
+  }
+
   var G = 'linear-gradient(135deg,' + cfg.colorFrom + ',' + cfg.colorTo + ')';
 
   // ── Styles ────────────────────────────────────────────────────────
   var css = document.createElement('style');
   css.textContent =
-    '#_oc_widget_root{position:fixed;bottom:24px;right:24px;z-index:2147483647;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column;align-items:flex-end;gap:12px}' +
+    '#_oc_widget_root{position:fixed;bottom:24px;right:24px;z-index:2147483647;font-family:"Kantumruy Pro","Source Sans 3",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column;align-items:flex-end;gap:12px}' +
     '#_ocw_btn{width:60px;height:60px;border-radius:50%;background:' + G + ';border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(0,0,0,.25);transition:transform .2s}' +
     '#_ocw_btn:hover{transform:scale(1.1)}' +
     // Panel: header + body side by side
@@ -155,7 +389,7 @@
         '<div id="_ocw_ava">' + cfg.avatar + '</div>' +
         '<div id="_ocw_info">' +
           '<strong>' + cfg.name + '</strong>' +
-          '<div id="_ocw_sublbl">AI Assistant · Online now</div>' +
+          '<div id="_ocw_sublbl">' + t('sublbl_ai') + '</div>' +
         '</div>' +
         '<button id="_ocw_close" title="Close">&times;</button>' +
       '</div>' +
@@ -168,7 +402,7 @@
             '<div id="_ocw_ai_msgs" class="_ocw_msgs"></div>' +
             '<div id="_ocw_chips_wrap" style="display:none;flex-shrink:0"></div>' +
             '<div class="_ocw_ftr">' +
-              '<input id="_ocw_ai_inp" class="_ocw_inp" type="text" placeholder="Ask me anything…" maxlength="500" disabled>' +
+              '<input id="_ocw_ai_inp" class="_ocw_inp" type="text" placeholder="' + t('ai_placeholder') + '" maxlength="500" disabled>' +
               '<button id="_ocw_ai_snd" class="_ocw_snd" disabled>' + SEND_ICO + '</button>' +
             '</div>' +
           '</div>' +
@@ -178,15 +412,15 @@
             // Idle / connect card
             '<div id="_ocw_lv_idle" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 24px;text-align:center;gap:14px;background:#f7f8fc">' +
               '<div class="lv_ico">' + LIVE_BIG_ICO + '</div>' +
-              '<h3 style="font-size:15px;font-weight:700;color:#111827;margin:0">Talk to a Live Agent</h3>' +
-              '<p style="font-size:12px;color:#6b7280;margin:0;line-height:1.6;max-width:200px">Connect directly with the ' + cfg.name + ' support team for personalized help.</p>' +
-              '<button id="_ocw_lv_connect">Connect Now</button>' +
+              '<h3 style="font-size:15px;font-weight:700;color:#111827;margin:0">' + t('lv_title') + '</h3>' +
+              '<p style="font-size:12px;color:#6b7280;margin:0;line-height:1.6;max-width:200px">' + t('lv_desc', { name: cfg.name }) + '</p>' +
+              '<button id="_ocw_lv_connect">' + t('lv_connect') + '</button>' +
             '</div>' +
             // Live chat area (shown after connecting)
             '<div id="_ocw_lv_chat" style="display:none;flex:1;flex-direction:column;overflow:hidden">' +
               '<div id="_ocw_lv_msgs" class="_ocw_msgs"></div>' +
               '<div class="_ocw_ftr">' +
-                '<input id="_ocw_lv_inp" class="_ocw_inp" type="text" placeholder="Message the agent…" maxlength="500" disabled>' +
+                '<input id="_ocw_lv_inp" class="_ocw_inp" type="text" placeholder="' + t('lv_placeholder_agent') + '" maxlength="500" disabled>' +
                 '<button id="_ocw_lv_snd" class="_ocw_snd" disabled>' + SEND_ICO + '</button>' +
               '</div>' +
             '</div>' +
@@ -275,8 +509,8 @@
   function rmDots(el) { if (el && el.parentNode) el.parentNode.removeChild(el); }
 
   function botSay(container, text, cb) {
-    var t = showDots(container);
-    setTimeout(function () { rmDots(t); appendScroll(container, msgEl(text, false)); if (cb) cb(); }, 750);
+    var td = showDots(container);
+    setTimeout(function () { rmDots(td); appendScroll(container, msgEl(text, false)); if (cb) cb(); }, 750);
   }
 
   // ── Topic chips ───────────────────────────────────────────────────
@@ -309,7 +543,7 @@
         var dots = showDots(aiMsgs);
         setTimeout(function () {
           rmDots(dots);
-          var reply = answer || ('Here is the information about ' + label + '. For more details please type your question below.');
+          var reply = answer || t('chip_fallback', { topic: label });
           appendScroll(aiMsgs, msgEl(reply, false));
           // Keep in history so follow-up questions have context
           aiHistory.push({ role: 'user',      content: label });
@@ -357,10 +591,10 @@
     lvPanel.style.display = tab === 'lv' ? 'flex' : 'none';
 
     if (tab === 'ai') {
-      sublbl.textContent = 'AI Assistant · Online now';
+      sublbl.textContent = t('sublbl_ai');
       if (!aiInp.disabled) aiInp.focus();
     } else {
-      sublbl.textContent = 'Live Agent · Online now';
+      sublbl.textContent = t('sublbl_lv');
       if (liveStep === 'idle' && cfg.api) {
         autoConnect();
       } else if (liveStep === 'connected') {
@@ -403,8 +637,8 @@
     lvChat.style.display = 'flex';
     lvInp.disabled = false;
     lvSnd.disabled = false;
-    botSay(lvMsgs, 'Sure! Before connecting you, may I have your name?', function () {
-      lvInp.placeholder = 'Your name…';
+    botSay(lvMsgs, t('ask_name'), function () {
+      lvInp.placeholder = t('lv_placeholder_name');
       lvInp.focus();
     });
   }
@@ -413,7 +647,7 @@
     liveStep = 'connecting';
     lvInp.disabled = true;
     lvSnd.disabled = true;
-    addLvSys('Connecting you to a live agent…');
+    addLvSys(t('connecting'));
 
     fetch(cfg.api + '/live-chat', {
       method: 'POST',
@@ -433,19 +667,19 @@
       liveChatId = data.chat_id;
       pollSince  = new Date().toISOString();
       liveStep   = 'connected';
-      addLvSys('✅ Connected! A support agent will reply here shortly.');
-      lvInp.placeholder = 'Message the agent…';
+      addLvSys(t('connected'));
+      lvInp.placeholder = t('lv_placeholder_agent');
       lvInp.disabled = false;
       lvSnd.disabled = false;
       lvInp.focus();
       startPolling();
     })
     .catch(function () {
-      addLvSys('Could not connect right now. Press Send to try again.');
+      addLvSys(t('connect_failed'));
       liveStep = 'failed';
       lvInp.disabled = false;
       lvSnd.disabled = false;
-      lvInp.placeholder = 'Press Send to retry…';
+      lvInp.placeholder = t('retry_placeholder');
       lvInp.value = '';
     });
   }
@@ -468,8 +702,8 @@
     if (liveStep === 'collect_name') {
       visitorName = txt;
       liveStep = 'collect_contact';
-      botSay(lvMsgs, 'Thanks, ' + visitorName + '! What\'s your email address or phone number so the agent can follow up with you?', function () {
-        lvInp.placeholder = 'Email or phone…';
+      botSay(lvMsgs, t('ask_contact', { name: visitorName }), function () {
+        lvInp.placeholder = t('lv_placeholder_contact');
         lvInp.focus();
       });
       return;
@@ -477,7 +711,7 @@
 
     if (liveStep === 'collect_contact') {
       visitorContact = txt;
-      lvInp.placeholder = 'Message the agent…';
+      lvInp.placeholder = t('lv_placeholder_agent');
       doConnect();
       return;
     }
@@ -500,7 +734,7 @@
     lastQ = txt;
 
     if (!cfg.api) {
-      botSay(aiMsgs, 'Please reach out via the channel icons in the sidebar!', null);
+      botSay(aiMsgs, t('no_api'), null);
       return;
     }
 
@@ -517,7 +751,7 @@
     .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
     .then(function (data) {
       rmDots(dots);
-      var reply = data.reply || 'Let me connect you with our support team.';
+      var reply = data.reply || t('no_api');
       aiHistory.push({ role: 'user',      content: txt   });
       aiHistory.push({ role: 'assistant', content: reply });
       if (aiHistory.length > 20) aiHistory = aiHistory.slice(-20);
@@ -535,7 +769,7 @@
     })
     .catch(function () {
       rmDots(dots);
-      addAiMsg('Sorry, I\'m having trouble right now. Please try again or use the channel links.', false);
+      addAiMsg(t('error'), false);
       aiInp.disabled = false;
       aiSnd.disabled = false;
     });
@@ -550,7 +784,7 @@
       if (!aiStarted && activeTab === 'ai') {
         aiStarted = true;
         fetchTopics();   // start fetching in parallel
-        botSay(aiMsgs, 'Hi there! 👋 I\'m ' + cfg.name + '\'s AI assistant. How can I help you today?', function () {
+        botSay(aiMsgs, t('greeting', { name: cfg.name }), function () {
           aiInp.disabled = false;
           aiSnd.disabled = false;
           aiInp.focus();

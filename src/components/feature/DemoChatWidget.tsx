@@ -10,15 +10,16 @@ const REPLIES = [
   "We'd love to help you get set up! Is there a specific channel you're looking to connect first — WhatsApp, Messenger, Instagram, or something else?",
 ];
 
-const C = "#1E7FC2";
+const C = "#24396D";
+const A = "#38BDEB";
 
 const CSS = `
-._ocl_btn{position:fixed;bottom:24px;right:24px;z-index:2147483647;width:56px;height:56px;border-radius:50%;background:${C};box-shadow:0 4px 16px rgba(30,127,194,.25);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .2s,box-shadow .2s}
-._ocl_btn:hover{transform:scale(1.08);box-shadow:0 6px 24px rgba(30,127,194,.4)}
+._ocl_btn{position:fixed;bottom:24px;right:24px;z-index:2147483647;width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,${C},${A});box-shadow:0 4px 16px rgba(36,57,109,.25);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .2s,box-shadow .2s}
+._ocl_btn:hover{transform:scale(1.08);box-shadow:0 6px 24px rgba(36,57,109,.4)}
 ._ocl_btn svg{width:24px;height:24px;fill:#fff}
-._ocl_wnd{position:fixed;bottom:92px;right:24px;z-index:2147483646;width:380px;max-width:calc(100vw - 32px);height:520px;max-height:calc(100vh - 140px);background:#fff;border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,.15);display:none;flex-direction:column;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+._ocl_wnd{position:fixed;bottom:92px;right:24px;z-index:2147483646;width:380px;max-width:calc(100vw - 32px);height:520px;max-height:calc(100vh - 140px);background:#fff;border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,.15);display:none;flex-direction:column;overflow:hidden;font-family:"Kantumruy Pro","Source Sans 3",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
 ._ocl_wnd._ocl_open{display:flex;animation:_ocl_in .25s ease}
-._ocl_hdr{background:linear-gradient(135deg,#1B3F73,#2E9FDE);padding:16px 20px;color:#fff;display:flex;align-items:center;gap:12px;flex-shrink:0}
+._ocl_hdr{background:linear-gradient(135deg,${C},${A});padding:16px 20px;color:#fff;display:flex;align-items:center;gap:12px;flex-shrink:0}
 ._ocl_ava{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px}
 ._ocl_info{flex:1;min-width:0}._ocl_info strong{display:block;font-size:14px}._ocl_info span{font-size:11px;opacity:.85}
 ._ocl_close{background:none;border:none;color:#fff;font-size:22px;cursor:pointer;padding:4px;opacity:.8;line-height:1}
@@ -26,12 +27,12 @@ const CSS = `
 ._ocl_msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;background:#f9fafb}
 ._ocl_bubble{max-width:85%;padding:10px 14px;border-radius:14px;font-size:13px;line-height:1.5;word-break:break-word}
 ._ocl_bot{background:#e5e7eb;color:#1f2937;align-self:flex-start;border-bottom-left-radius:4px}
-._ocl_user{background:${C};color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
+._ocl_user{background:linear-gradient(135deg,${C},${A});color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
 ._ocl_inp{display:flex;align-items:center;gap:8px;padding:12px 16px;border-top:1px solid #e5e7eb;flex-shrink:0;background:#fff}
 ._ocl_inp input{flex:1;border:none;outline:none;font-size:13px;padding:10px 0;background:transparent;color:#1f2937}
 ._ocl_inp input::placeholder{color:#9ca3af}
 ._ocl_send{width:38px;height:38px;border-radius:50%;background:${C};border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .2s}
-._ocl_send:hover{background:#15396B}
+._ocl_send:hover{background:#14203D}
 ._ocl_send svg{width:16px;height:16px;fill:#fff}
 @keyframes _ocl_in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 `;

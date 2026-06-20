@@ -40,8 +40,8 @@ export default function Dashboard() {
   const [widgetOpen, setWidgetOpen] = useState(false);
   const [widgetName, setWidgetName] = useState("");
   const [widgetAvatar, setWidgetAvatar] = useState("");
-  const [widgetColorFrom, setWidgetColorFrom] = useState("#0099FF");
-  const [widgetColorTo, setWidgetColorTo] = useState("#A033FF");
+  const [widgetColorFrom, setWidgetColorFrom] = useState("#24396D");
+  const [widgetColorTo, setWidgetColorTo] = useState("#38BDEB");
   const [widgetContacts, setWidgetContacts] = useState<Record<string, string>>({});
   const [widgetCopied, setWidgetCopied] = useState(false);
   const [widgetSaving, setWidgetSaving] = useState(false);
@@ -173,8 +173,8 @@ export default function Dashboard() {
     if (partnerIdState)                       lines.push(`  data-partner-id="${partnerIdState}"`);
     if (widgetName)                           lines.push(`  data-name="${widgetName}"`);
     if (widgetAvatar)                         lines.push(`  data-avatar="${widgetAvatar}"`);
-    if (widgetColorFrom !== "#0099FF")        lines.push(`  data-color-from="${widgetColorFrom}"`);
-    if (widgetColorTo   !== "#A033FF")        lines.push(`  data-color-to="${widgetColorTo}"`);
+    if (widgetColorFrom !== "#24396D")        lines.push(`  data-color-from="${widgetColorFrom}"`);
+    if (widgetColorTo   !== "#38BDEB")        lines.push(`  data-color-to="${widgetColorTo}"`);
     if (supabaseApiBase && !supabaseApiBase.startsWith("undefined")) lines.push(`  data-api="${supabaseApiBase}"`);
     if (widgetContacts.messenger)             lines.push(`  data-messenger="${widgetContacts.messenger}"`);
     if (widgetContacts.whatsapp)              lines.push(`  data-whatsapp="${widgetContacts.whatsapp}"`);
@@ -346,13 +346,13 @@ ${date.toISOString().split("T")[0]}
   return (
     <>
       <Navbar />
-      <main className="pt-20 md:pt-24 min-h-screen bg-background-50">
+      <main className="pt-20 md:pt-24 min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(56,189,235,0.12),transparent_34%),linear-gradient(180deg,#FCFBF7_0%,#F7F4EC_100%)]">
         <div className="px-4 md:px-6 py-8 md:py-12">
           <div className="max-w-6xl mx-auto">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
               <div>
-                <h1 className="font-heading text-2xl md:text-3xl font-bold text-foreground-950">Channel Dashboard</h1>
+                <h1 className="font-heading text-2xl md:text-3xl font-extrabold text-foreground-950">Channel Dashboard</h1>
                 <p className="text-sm text-foreground-500 mt-1">
                   {partnerName ? `${partnerName}'s unified inbox` : "Monitor and manage all your connected messaging channels"}
                 </p>
