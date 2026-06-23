@@ -107,7 +107,7 @@ export function OPSConnectWidget({
         domStorageEnabled
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
-        mixedContentMode={Platform.OS === 'android' ? 'always' : undefined}
+        {...(Platform.OS === 'android' ? { mixedContentMode: 'always' as const } : {})}
         originWhitelist={['*']}
       />
     </SafeAreaView>
@@ -124,7 +124,10 @@ const styles = StyleSheet.create({
   },
   loader: {
     position: 'absolute',
-    inset: 0,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#fff',
