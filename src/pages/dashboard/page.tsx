@@ -119,52 +119,57 @@ export default function Dashboard() {
 
   const showToast = (msg: string) => { setToastMessage(msg); setTimeout(() => setToastMessage(null), 2500); };
 
-  const extractColorsFromLogo = (imgUrl: string): Promise<{ from: string; to: string } | null> => {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        try {
-          const SIZE = 80;
-          const canvas = document.createElement('canvas');
-          canvas.width = SIZE; canvas.height = SIZE;
-          const ctx = canvas.getContext('2d');
-          if (!ctx) return resolve(null);
-          ctx.drawImage(img, 0, 0, SIZE, SIZE);
-          const { data } = ctx.getImageData(0, 0, SIZE, SIZE);
+  const extractColorsFromLogo = async (imgUrl: string): Promise<{ from: string; to: string } | null> => {
+    const toHex = (r: number, g: number, b: number) =>
+      '#' + [r, g, b].map(v => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0')).join('');
 
-          // bucket colors into 32-step grid, skip transparent/white/black/gray
-          const buckets: Record<string, { r: number; g: number; b: number; count: number }> = {};
-          for (let i = 0; i < data.length; i += 4) {
-            const [r, g, b, a] = [data[i], data[i+1], data[i+2], data[i+3]];
-            if (a < 128) continue;
-            const max = Math.max(r, g, b), min = Math.min(r, g, b);
-            const sat = max === 0 ? 0 : (max - min) / max;
-            const lit = (max + min) / 510;
-            if (sat < 0.18 || lit > 0.90 || lit < 0.07) continue;
-            const key = `${Math.round(r/32)*32},${Math.round(g/32)*32},${Math.round(b/32)*32}`;
-            if (!buckets[key]) buckets[key] = { r: Math.round(r/32)*32, g: Math.round(g/32)*32, b: Math.round(b/32)*32, count: 0 };
-            buckets[key].count++;
-          }
-
-          const sorted = Object.values(buckets).sort((a, b) => b.count - a.count);
-          if (sorted.length === 0) return resolve(null);
-
-          const hex = (r: number, g: number, b: number) =>
-            '#' + [r, g, b].map(v => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0')).join('');
-
-          const top = sorted[0];
-          // darken for colorFrom, use original for colorTo
-          const colorTo = hex(top.r, top.g, top.b);
-          const colorFrom = hex(Math.round(top.r * 0.55), Math.round(top.g * 0.55), Math.round(top.b * 0.55));
-          resolve({ from: colorFrom, to: colorTo });
-        } catch {
-          resolve(null);
-        }
+    const analysePixels = (data: Uint8ClampedArray): { from: string; to: string } | null => {
+      const buckets: Record<string, { r: number; g: number; b: number; count: number }> = {};
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
+        if (a < 128) continue;
+        const max = Math.max(r, g, b), min = Math.min(r, g, b);
+        const sat = max === 0 ? 0 : (max - min) / max;
+        const lit = (max + min) / 510;
+        if (sat < 0.18 || lit > 0.90 || lit < 0.07) continue;
+        const br = Math.round(r / 32) * 32, bg = Math.round(g / 32) * 32, bb = Math.round(b / 32) * 32;
+        const key = `${br},${bg},${bb}`;
+        if (!buckets[key]) buckets[key] = { r: br, g: bg, b: bb, count: 0 };
+        buckets[key].count++;
+      }
+      const sorted = Object.values(buckets).sort((a, b) => b.count - a.count);
+      if (sorted.length === 0) return null;
+      const top = sorted[0];
+      return {
+        to: toHex(top.r, top.g, top.b),
+        from: toHex(Math.round(top.r * 0.55), Math.round(top.g * 0.55), Math.round(top.b * 0.55)),
       };
-      img.onerror = () => resolve(null);
-      img.src = imgUrl;
-    });
+    };
+
+    try {
+      const res = await fetch(imgUrl, { mode: 'cors', cache: 'no-cache' });
+      if (!res.ok) return null;
+      const blobUrl = URL.createObjectURL(await res.blob());
+      return new Promise<{ from: string; to: string } | null>((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          URL.revokeObjectURL(blobUrl);
+          try {
+            const SIZE = 80;
+            const canvas = document.createElement('canvas');
+            canvas.width = SIZE; canvas.height = SIZE;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) { resolve(null); return; }
+            ctx.drawImage(img, 0, 0, SIZE, SIZE);
+            resolve(analysePixels(ctx.getImageData(0, 0, SIZE, SIZE).data));
+          } catch { resolve(null); }
+        };
+        img.onerror = () => { URL.revokeObjectURL(blobUrl); resolve(null); };
+        img.src = blobUrl;
+      });
+    } catch {
+      return null;
+    }
   };
 
   const handleExtractColors = async () => {

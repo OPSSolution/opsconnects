@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { getSession, clearSession } from "@/utils/auth";
+import { supabase } from "@/utils/supabase/client";
 
 const PUBLIC_LINKS = [
   { label: "Features", href: "/#features" },
@@ -13,9 +14,21 @@ export default function Navbar() {
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [session, setSession_] = useState<ReturnType<typeof getSession> extends Promise<infer T> ? T : never>(null);
+  const [partnerLogo, setPartnerLogo] = useState<string>("");
 
   useEffect(() => {
-    getSession().then(setSession_);
+    getSession().then(async (s) => {
+      setSession_(s);
+      if (s?.role === "partner" && s.partnerDbId) {
+        const { data } = await supabase
+          .from("partners")
+          .select("widget_settings")
+          .eq("id", s.partnerDbId)
+          .maybeSingle();
+        const logo = (data?.widget_settings as Record<string, unknown>)?.logo;
+        if (logo) setPartnerLogo(logo as string);
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -100,10 +113,11 @@ export default function Navbar() {
           ) : (
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-full bg-primary-100 flex items-center justify-center">
-                  <span className="text-xs font-bold text-primary-600">
-                    {session.partnerName.slice(0, 2).toUpperCase()}
-                  </span>
+                <div className="w-7 h-7 rounded-full bg-primary-100 flex items-center justify-center overflow-hidden flex-shrink-0">
+                  {partnerLogo
+                    ? <img src={partnerLogo} alt={session.partnerName} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                    : <span className="text-xs font-bold text-primary-600">{session.partnerName.slice(0, 2).toUpperCase()}</span>
+                  }
                 </div>
                 <span className="text-xs font-medium text-white/75 max-w-[120px] truncate">
                   {session.partnerName}
