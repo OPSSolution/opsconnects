@@ -1,40 +1,24 @@
 import React, { useRef } from 'react';
-import {
-  StyleSheet,
-  View,
-  ActivityIndicator,
-  Platform,
-  SafeAreaView,
-} from 'react-native';
-import { WebView, WebViewMessageEvent } from 'react-native-webview';
+import { StyleSheet, View, ActivityIndicator } from 'react-native';
+import { WebView } from 'react-native-webview';
+import type { WebViewMessageEvent } from 'react-native-webview';
 
 export interface OPSConnectWidgetProps {
-  /** Partner ID from the OPSConnect dashboard (e.g. "PART-XXXX-XXXX") */
   partnerId: string;
-  /** Supabase edge function base URL (e.g. "https://xxx.supabase.co/functions/v1") */
   api: string;
-  /** Business display name shown in the widget header */
   name?: string;
-  /** 1-2 letter avatar initials — used when no logo is set */
   avatar?: string;
-  /** Full URL to the partner logo image */
   logo?: string;
-  /** Gradient start color (hex) */
   colorFrom?: string;
-  /** Gradient end color (hex) */
   colorTo?: string;
-  /** Default language code: en, km, zh, ja, ko, th, vi, id, fr, es */
   lang?: string;
-  /** Channel contact links */
   messenger?: string;
   whatsapp?: string;
   telegram?: string;
   line?: string;
   instagram?: string;
   email?: string;
-  /** Called when the widget is closed (user taps X) */
   onClose?: () => void;
-  /** Base URL of OPSConnect deployment */
   baseUrl?: string;
 }
 
@@ -58,76 +42,61 @@ export function OPSConnectWidget({
   onClose,
   baseUrl = DEFAULT_BASE_URL,
 }: OPSConnectWidgetProps) {
-  const webViewRef = useRef<WebView>(null);
+  const webViewRef = useRef<InstanceType<typeof WebView>>(null);
 
-  const params = new URLSearchParams({
-    partner_id: partnerId,
-    api,
-    name,
-    avatar,
-    logo,
-    color_from: colorFrom,
-    color_to: colorTo,
-    lang,
-    messenger,
-    whatsapp,
-    telegram,
-    line,
-    instagram,
-    email,
-  });
+  const qs = [
+    'partner_id=' + encodeURIComponent(partnerId),
+    'api=' + encodeURIComponent(api),
+    'name=' + encodeURIComponent(name),
+    'avatar=' + encodeURIComponent(avatar),
+    'logo=' + encodeURIComponent(logo),
+    'color_from=' + encodeURIComponent(colorFrom),
+    'color_to=' + encodeURIComponent(colorTo),
+    'lang=' + encodeURIComponent(lang),
+    'messenger=' + encodeURIComponent(messenger),
+    'whatsapp=' + encodeURIComponent(whatsapp),
+    'telegram=' + encodeURIComponent(telegram),
+    'line=' + encodeURIComponent(line),
+    'instagram=' + encodeURIComponent(instagram),
+    'email=' + encodeURIComponent(email),
+  ].join('&');
 
-  const uri = `${baseUrl}/widget-mobile.html?${params.toString()}`;
+  const uri = baseUrl + '/widget-mobile.html?' + qs;
 
-  const handleMessage = (event: WebViewMessageEvent) => {
+  const onMessage = (event: WebViewMessageEvent) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
       if (data.type === 'close' && onClose) onClose();
-    } catch {
-      // ignore non-JSON messages
-    }
+    } catch {}
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <WebView
         ref={webViewRef}
         source={{ uri }}
         style={styles.webview}
-        onMessage={handleMessage}
         startInLoadingState
+        javaScriptEnabled
+        domStorageEnabled
+        originWhitelist={['*']}
+        onMessage={onMessage}
         renderLoading={() => (
           <View style={styles.loader}>
             <ActivityIndicator size="large" color={colorFrom} />
           </View>
         )}
-        allowsInlineMediaPlayback
-        mediaPlaybackRequiresUserAction={false}
-        javaScriptEnabled
-        domStorageEnabled
-        sharedCookiesEnabled
-        thirdPartyCookiesEnabled
-        {...(Platform.OS === 'android' ? { mixedContentMode: 'always' as const } : {})}
-        originWhitelist={['*']}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  webview: {
-    flex: 1,
-  },
+  container: { flex: 1, backgroundColor: '#fff' },
+  webview: { flex: 1 },
   loader: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    top: 0, left: 0, right: 0, bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#fff',
