@@ -119,6 +119,66 @@ export default function Dashboard() {
 
   const showToast = (msg: string) => { setToastMessage(msg); setTimeout(() => setToastMessage(null), 2500); };
 
+  const extractColorsFromLogo = (imgUrl: string): Promise<{ from: string; to: string } | null> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try {
+          const SIZE = 80;
+          const canvas = document.createElement('canvas');
+          canvas.width = SIZE; canvas.height = SIZE;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return resolve(null);
+          ctx.drawImage(img, 0, 0, SIZE, SIZE);
+          const { data } = ctx.getImageData(0, 0, SIZE, SIZE);
+
+          // bucket colors into 32-step grid, skip transparent/white/black/gray
+          const buckets: Record<string, { r: number; g: number; b: number; count: number }> = {};
+          for (let i = 0; i < data.length; i += 4) {
+            const [r, g, b, a] = [data[i], data[i+1], data[i+2], data[i+3]];
+            if (a < 128) continue;
+            const max = Math.max(r, g, b), min = Math.min(r, g, b);
+            const sat = max === 0 ? 0 : (max - min) / max;
+            const lit = (max + min) / 510;
+            if (sat < 0.18 || lit > 0.90 || lit < 0.07) continue;
+            const key = `${Math.round(r/32)*32},${Math.round(g/32)*32},${Math.round(b/32)*32}`;
+            if (!buckets[key]) buckets[key] = { r: Math.round(r/32)*32, g: Math.round(g/32)*32, b: Math.round(b/32)*32, count: 0 };
+            buckets[key].count++;
+          }
+
+          const sorted = Object.values(buckets).sort((a, b) => b.count - a.count);
+          if (sorted.length === 0) return resolve(null);
+
+          const hex = (r: number, g: number, b: number) =>
+            '#' + [r, g, b].map(v => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0')).join('');
+
+          const top = sorted[0];
+          // darken for colorFrom, use original for colorTo
+          const colorTo = hex(top.r, top.g, top.b);
+          const colorFrom = hex(Math.round(top.r * 0.55), Math.round(top.g * 0.55), Math.round(top.b * 0.55));
+          resolve({ from: colorFrom, to: colorTo });
+        } catch {
+          resolve(null);
+        }
+      };
+      img.onerror = () => resolve(null);
+      img.src = imgUrl;
+    });
+  };
+
+  const handleExtractColors = async () => {
+    if (!widgetLogo) return;
+    const result = await extractColorsFromLogo(widgetLogo);
+    if (result) {
+      setWidgetColorFrom(result.from);
+      setWidgetColorTo(result.to);
+      showToast('Colors extracted from logo!');
+    } else {
+      showToast('Could not read colors — try a logo hosted on your own domain or uploaded via the Upload button.');
+    }
+  };
+
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !partnerIdState) return;
@@ -1011,6 +1071,17 @@ ${date.toISOString().split("T")[0]}
                                 <span className="text-xs font-mono text-foreground-600">{widgetColorTo}</span>
                               </div>
                             </div>
+                            {widgetLogo && (
+                              <div className="sm:col-span-2">
+                                <button
+                                  onClick={handleExtractColors}
+                                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border border-primary-400 text-primary-600 hover:bg-primary-50 transition-colors cursor-pointer"
+                                >
+                                  <i className="ri-magic-line" /> Auto-detect colors from logo
+                                </button>
+                                <p className="text-[11px] text-foreground-400 mt-1">Extracts the dominant color from your logo and applies it to the gradient.</p>
+                              </div>
+                            )}
                           </div>
                         </div>
 
