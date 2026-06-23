@@ -42,6 +42,7 @@ export default function Dashboard() {
   const [widgetAvatar, setWidgetAvatar] = useState("");
   const [widgetColorFrom, setWidgetColorFrom] = useState("#24396D");
   const [widgetColorTo, setWidgetColorTo] = useState("#38BDEB");
+  const [widgetLogo, setWidgetLogo] = useState("");
   const [widgetContacts, setWidgetContacts] = useState<Record<string, string>>({});
   const [widgetCopied, setWidgetCopied] = useState(false);
   const [widgetSaving, setWidgetSaving] = useState(false);
@@ -69,6 +70,7 @@ export default function Dashboard() {
             const ws = pd.widget_settings as Record<string, unknown>;
             if (ws.name)      setWidgetName(ws.name as string);
             if (ws.avatar)    setWidgetAvatar(ws.avatar as string);
+            if (ws.logo)      setWidgetLogo(ws.logo as string);
             if (ws.colorFrom) setWidgetColorFrom(ws.colorFrom as string);
             if (ws.colorTo)   setWidgetColorTo(ws.colorTo as string);
             if (ws.contacts)  setWidgetContacts(ws.contacts as Record<string, string>);
@@ -124,6 +126,7 @@ export default function Dashboard() {
         widget_settings: {
           name: widgetName,
           avatar: widgetAvatar,
+          logo: widgetLogo,
           colorFrom: widgetColorFrom,
           colorTo: widgetColorTo,
           contacts: widgetContacts,
@@ -172,6 +175,7 @@ export default function Dashboard() {
     const lines: string[] = [`  src="${origin}/widget.js"`];
     if (partnerIdState)                       lines.push(`  data-partner-id="${partnerIdState}"`);
     if (widgetName)                           lines.push(`  data-name="${widgetName}"`);
+    if (widgetLogo)                           lines.push(`  data-logo="${widgetLogo}"`);
     if (widgetAvatar)                         lines.push(`  data-avatar="${widgetAvatar}"`);
     if (widgetColorFrom !== "#24396D")        lines.push(`  data-color-from="${widgetColorFrom}"`);
     if (widgetColorTo   !== "#38BDEB")        lines.push(`  data-color-to="${widgetColorTo}"`);
@@ -872,7 +876,7 @@ ${date.toISOString().split("T")[0]}
                               />
                             </div>
                             <div>
-                              <label className="text-xs font-medium text-foreground-600 block mb-1">Avatar initials</label>
+                              <label className="text-xs font-medium text-foreground-600 block mb-1">Avatar initials <span className="text-foreground-400 font-normal">(shown if no logo)</span></label>
                               <input
                                 type="text"
                                 value={widgetAvatar}
@@ -881,6 +885,26 @@ ${date.toISOString().split("T")[0]}
                                 maxLength={2}
                                 className="w-full bg-background-50 border border-background-200/70 rounded-lg px-3 py-2 text-sm text-foreground-800 outline-none focus:border-primary-400 placeholder:text-foreground-300 uppercase"
                               />
+                            </div>
+                            <div className="sm:col-span-2">
+                              <label className="text-xs font-medium text-foreground-600 block mb-1">Logo URL <span className="text-foreground-400 font-normal">(replaces avatar — use a square PNG/SVG)</span></label>
+                              <div className="flex items-center gap-2">
+                                {widgetLogo && (
+                                  <img src={widgetLogo} alt="logo preview" className="w-9 h-9 rounded-full object-cover border border-background-200/70 flex-shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                                )}
+                                <input
+                                  type="url"
+                                  value={widgetLogo}
+                                  onChange={(e) => setWidgetLogo(e.target.value)}
+                                  placeholder="https://yourdomain.com/logo.png"
+                                  className="flex-1 bg-background-50 border border-background-200/70 rounded-lg px-3 py-2 text-sm text-foreground-800 outline-none focus:border-primary-400 placeholder:text-foreground-300"
+                                />
+                                {widgetLogo && (
+                                  <button onClick={() => setWidgetLogo("")} className="text-foreground-400 hover:text-foreground-700 flex-shrink-0 cursor-pointer" title="Remove logo">
+                                    <i className="ri-close-line text-lg" />
+                                  </button>
+                                )}
+                              </div>
                             </div>
                             <div>
                               <label className="text-xs font-medium text-foreground-600 block mb-1">Color — from</label>
@@ -987,10 +1011,12 @@ ${date.toISOString().split("T")[0]}
                           <div className="bg-background-50 rounded-xl border border-background-200/70 p-4 flex items-center justify-between gap-4">
                             <div className="flex items-center gap-3">
                               <div
-                                className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-lg"
+                                className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-lg overflow-hidden"
                                 style={{ background: `linear-gradient(135deg, ${widgetColorFrom}, ${widgetColorTo})` }}
                               >
-                                {widgetAvatar || "?"}
+                                {widgetLogo
+                                  ? <img src={widgetLogo} alt="logo" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                                  : (widgetAvatar || "?")}
                               </div>
                               <div>
                                 <p className="text-sm font-semibold text-foreground-900">{widgetName || "Your Business"}</p>

@@ -40,6 +40,7 @@
     partnerId:  attr('partner-id',  ''),
     name:       attr('name',        'Support'),
     avatar:     attr('avatar',      '?'),
+    logo:       attr('logo',        ''),
     colorFrom:  attr('color-from',  '#24396D'),
     colorTo:    attr('color-to',    '#38BDEB'),
     api:        attr('api',         ''),
@@ -310,7 +311,8 @@
     '#_ocw_panel.open{display:flex;animation:_ocw_in .25s ease}' +
     '@keyframes _ocw_in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}' +
     '#_ocw_hdr{background:' + G + ';padding:13px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0}' +
-    '#_ocw_ava{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;color:#fff;flex-shrink:0}' +
+    '#_ocw_ava{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;color:#fff;flex-shrink:0;overflow:hidden}' +
+    '#_ocw_ava img{width:100%;height:100%;object-fit:cover;border-radius:50%}' +
     '#_ocw_info{flex:1;min-width:0}' +
     '#_ocw_info strong{display:block;color:#fff;font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
     '#_ocw_sublbl{font-size:11px;color:rgba(255,255,255,.85);margin-top:1px;display:flex;align-items:center;gap:4px}' +
@@ -415,7 +417,7 @@
   root.innerHTML =
     '<div id="_ocw_panel">' +
       '<div id="_ocw_hdr">' +
-        '<div id="_ocw_ava">' + cfg.avatar + '</div>' +
+        '<div id="_ocw_ava">' + (cfg.logo ? '<img src="' + cfg.logo + '" alt="' + cfg.name + '">' : cfg.avatar) + '</div>' +
         '<div id="_ocw_info">' +
           '<strong>' + cfg.name + '</strong>' +
           '<div id="_ocw_sublbl">' + t('sublbl_ai') + '</div>' +
