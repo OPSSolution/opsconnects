@@ -43,6 +43,7 @@ export default function Dashboard() {
   const [widgetColorFrom, setWidgetColorFrom] = useState("#24396D");
   const [widgetColorTo, setWidgetColorTo] = useState("#38BDEB");
   const [widgetLogo, setWidgetLogo] = useState("");
+  const [logoUploading, setLogoUploading] = useState(false);
   const [widgetContacts, setWidgetContacts] = useState<Record<string, string>>({});
   const [widgetCopied, setWidgetCopied] = useState(false);
   const [widgetRnCopied, setWidgetRnCopied] = useState(false);
@@ -117,6 +118,26 @@ export default function Dashboard() {
   }, []);
 
   const showToast = (msg: string) => { setToastMessage(msg); setTimeout(() => setToastMessage(null), 2500); };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !partnerIdState) return;
+    setLogoUploading(true);
+    const ext = file.name.split('.').pop();
+    const path = `${partnerIdState}/logo.${ext}`;
+    const { data, error } = await supabase.storage
+      .from('partner-logos')
+      .upload(path, file, { upsert: true, contentType: file.type });
+    if (error) {
+      showToast('Upload failed: ' + error.message);
+    } else {
+      const { data: urlData } = supabase.storage.from('partner-logos').getPublicUrl(data.path);
+      setWidgetLogo(urlData.publicUrl);
+      showToast('Logo uploaded!');
+    }
+    setLogoUploading(false);
+    e.target.value = '';
+  };
 
   const saveWidgetSettings = async () => {
     if (!partnerDbId) return;
@@ -955,18 +976,26 @@ ${date.toISOString().split("T")[0]}
                               />
                             </div>
                             <div className="sm:col-span-2">
-                              <label className="text-xs font-medium text-foreground-600 block mb-1">Logo URL <span className="text-foreground-400 font-normal">(replaces avatar — use a square PNG/SVG)</span></label>
+                              <label className="text-xs font-medium text-foreground-600 block mb-1">Logo <span className="text-foreground-400 font-normal">(replaces avatar — square PNG/SVG, max 2 MB)</span></label>
                               <div className="flex items-center gap-2">
-                                {widgetLogo && (
-                                  <img src={widgetLogo} alt="logo preview" className="w-9 h-9 rounded-full object-cover border border-background-200/70 flex-shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                                {widgetLogo ? (
+                                  <img src={widgetLogo} alt="logo" className="w-10 h-10 rounded-full object-cover border border-background-200/70 flex-shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                                ) : (
+                                  <div className="w-10 h-10 rounded-full border-2 border-dashed border-background-300 flex items-center justify-center flex-shrink-0">
+                                    <i className="ri-image-line text-foreground-300 text-base" />
+                                  </div>
                                 )}
                                 <input
                                   type="url"
                                   value={widgetLogo}
                                   onChange={(e) => setWidgetLogo(e.target.value)}
-                                  placeholder="https://yourdomain.com/logo.png"
+                                  placeholder="Paste image URL, or upload →"
                                   className="flex-1 bg-background-50 border border-background-200/70 rounded-lg px-3 py-2 text-sm text-foreground-800 outline-none focus:border-primary-400 placeholder:text-foreground-300"
                                 />
+                                <label className={`flex-shrink-0 cursor-pointer flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border transition-colors ${logoUploading ? 'opacity-50 pointer-events-none border-background-200 text-foreground-400' : 'border-primary-400 text-primary-600 hover:bg-primary-50'}`}>
+                                  {logoUploading ? <><span className="w-3 h-3 border-2 border-primary-400 border-t-transparent rounded-full animate-spin" /> Uploading…</> : <><i className="ri-upload-2-line" /> Upload</>}
+                                  <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="hidden" onChange={handleLogoUpload} disabled={logoUploading} />
+                                </label>
                                 {widgetLogo && (
                                   <button onClick={() => setWidgetLogo("")} className="text-foreground-400 hover:text-foreground-700 flex-shrink-0 cursor-pointer" title="Remove logo">
                                     <i className="ri-close-line text-lg" />
