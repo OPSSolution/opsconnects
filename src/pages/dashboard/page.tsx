@@ -211,54 +211,48 @@ export default function Dashboard() {
     return `<script\n${lines.join("\n")}>\n</script>`;
   };
 
-  const generateReactNativeScript = () => {
+  const generateReactNativeSnippet = () => {
     const supabaseApiBase = (import.meta.env.VITE_PUBLIC_SUPABASE_URL as string) + "/functions/v1";
     const apiBase = supabaseApiBase && !supabaseApiBase.startsWith("undefined") ? supabaseApiBase : "https://your-project.supabase.co/functions/v1";
-    const partnerId = partnerIdState || "<partner-id>";
-    return [
-      "// React Native API client for OPSConnect",
-      "const OPSCONNECT_API_BASE = '" + apiBase + "';",
-      "",
-      "async function fetchWidgetTopics(partnerId = '" + partnerId + "') {",
-      "  const res = await fetch(`${OPSCONNECT_API_BASE}/widget-init?partner_id=${encodeURIComponent(partnerId)}`);",
-      "  if (!res.ok) throw new Error('Failed to load widget topics');",
-      "  return res.json();",
-      "}",
-      "",
-      "async function sendAiMessage({ partnerId = '" + partnerId + "', message, history = [], lang = 'en' }) {",
-      "  const res = await fetch(`${OPSCONNECT_API_BASE}/ai-chat`, {",
-      "    method: 'POST',",
-      "    headers: { 'Content-Type': 'application/json' },",
-      "    body: JSON.stringify({ partner_id: partnerId, message, history, lang }),",
-      "  });",
-      "  if (!res.ok) throw new Error('AI chat request failed');",
-      "  return res.json();",
-      "}",
-      "",
-      "async function createSupportRequest({ partnerId = '" + partnerId + "', visitorName, visitorContact, message, company, topic }) {",
-      "  const res = await fetch(`${OPSCONNECT_API_BASE}/chat-support`, {",
-      "    method: 'POST',",
-      "    headers: { 'Content-Type': 'application/json' },",
-      "    body: JSON.stringify({",
-      "      partner_id: partnerId,",
-      "      visitor_name: visitorName,",
-      "      visitor_contact: visitorContact,",
-      "      message,",
-      "      company,",
-      "      topic,",
-      "    }),",
-      "  });",
-      "  if (!res.ok) throw new Error('Support request failed');",
-      "  return res.json();",
-      "}",
-      "",
-      "export { fetchWidgetTopics, sendAiMessage, createSupportRequest };",
-      "",
-      "// Example usage:",
-      "// const topics = await fetchWidgetTopics();",
-      "// const aiResponse = await sendAiMessage({ message: 'Hello', history: [] });",
-      "// await createSupportRequest({ visitorName: 'Jane Doe', visitorContact: 'jane@example.com', message: 'Need help', company: '', topic: '' });",
-    ].join("\n");
+    const pid = partnerIdState || "<your-partner-id>";
+    const lines: string[] = [];
+    lines.push("// 1. Install: npm install react-native-webview");
+    lines.push("// 2. Copy sdk/react-native/src/OPSConnectWidget.tsx into your project");
+    lines.push("// 3. Use the component:");
+    lines.push("");
+    lines.push("import React, { useState } from 'react';");
+    lines.push("import { Modal, TouchableOpacity, Text } from 'react-native';");
+    lines.push("import { OPSConnectWidget } from './OPSConnectWidget';");
+    lines.push("");
+    lines.push("export default function App() {");
+    lines.push("  const [chatOpen, setChatOpen] = useState(false);");
+    lines.push("  return (");
+    lines.push("    <>")
+    lines.push("      <TouchableOpacity onPress={() => setChatOpen(true)}>");
+    lines.push("        <Text>Chat with us</Text>");
+    lines.push("      </TouchableOpacity>");
+    lines.push("");
+    lines.push("      <Modal visible={chatOpen} animationType=\"slide\" onRequestClose={() => setChatOpen(false)}>");
+    lines.push("        <OPSConnectWidget");
+    lines.push(`          partnerId="${pid}"`);
+    lines.push(`          api="${apiBase}"`);
+    if (widgetName)      lines.push(`          name="${widgetName}"`);
+    if (widgetLogo)      lines.push(`          logo="${widgetLogo}"`);
+    if (widgetAvatar)    lines.push(`          avatar="${widgetAvatar}"`);
+    if (widgetColorFrom !== "#24396D") lines.push(`          colorFrom="${widgetColorFrom}"`);
+    if (widgetColorTo   !== "#38BDEB") lines.push(`          colorTo="${widgetColorTo}"`);
+    if (widgetContacts.whatsapp)       lines.push(`          whatsapp="${widgetContacts.whatsapp}"`);
+    if (widgetContacts.telegram)       lines.push(`          telegram="${widgetContacts.telegram}"`);
+    if (widgetContacts.messenger)      lines.push(`          messenger="${widgetContacts.messenger}"`);
+    if (widgetContacts.instagram)      lines.push(`          instagram="${widgetContacts.instagram}"`);
+    if (widgetContacts.email)          lines.push(`          email="${widgetContacts.email}"`);
+    lines.push("          onClose={() => setChatOpen(false)}");
+    lines.push("        />");
+    lines.push("      </Modal>");
+    lines.push("    </>");
+    lines.push("  );");
+    lines.push("}");
+    return lines.join("\n");
   };
 
   const handleCopyEmbed = async () => {
@@ -280,7 +274,7 @@ export default function Dashboard() {
   };
 
   const handleCopyReactNativeScript = async () => {
-    const code = generateReactNativeScript();
+    const code = generateReactNativeSnippet();
     try {
       await navigator.clipboard.writeText(code);
     } catch {
@@ -1104,10 +1098,14 @@ ${date.toISOString().split("T")[0]}
 
                         {/* Step 4: React Native API client */}
                         <div>
-                          <p className="text-xs font-semibold uppercase tracking-widest text-foreground-400 mb-3">4 — React Native API Client</p>
-                          <p className="text-xs text-foreground-500 mb-3">Copy this generated React Native helper into your mobile app to reuse the same backend APIs.</p>
+                          <p className="text-xs font-semibold uppercase tracking-widest text-foreground-400 mb-3">4 — React Native SDK</p>
+                          <p className="text-xs text-foreground-500 mb-3">
+                            Install <code className="bg-background-200 px-1 rounded text-[11px]">react-native-webview</code>, copy{" "}
+                            <code className="bg-background-200 px-1 rounded text-[11px]">sdk/react-native/src/OPSConnectWidget.tsx</code>{" "}
+                            from this repo into your project, then use the snippet below.
+                          </p>
                           <div className="relative">
-                            <pre className="bg-foreground-950 text-accent-300 text-[11px] font-mono rounded-xl p-4 overflow-x-auto leading-relaxed whitespace-pre max-h-72">{generateReactNativeScript()}</pre>
+                            <pre className="bg-foreground-950 text-accent-300 text-[11px] font-mono rounded-xl p-4 overflow-x-auto leading-relaxed whitespace-pre max-h-72">{generateReactNativeSnippet()}</pre>
                             <button
                               onClick={handleCopyReactNativeScript}
                               className={`absolute top-3 right-3 text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1 ${
@@ -1121,7 +1119,7 @@ ${date.toISOString().split("T")[0]}
                             </button>
                           </div>
                           <p className="text-xs text-foreground-400 mt-2.5">
-                            Paste this helper into your React Native project and call the exported functions from your chat screen.
+                            The widget opens in a full-screen Modal on iOS and Android with all your branding and AI settings pre-loaded.
                           </p>
                         </div>
 
