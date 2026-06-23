@@ -45,6 +45,7 @@ export default function Dashboard() {
   const [widgetLogo, setWidgetLogo] = useState("");
   const [widgetContacts, setWidgetContacts] = useState<Record<string, string>>({});
   const [widgetCopied, setWidgetCopied] = useState(false);
+  const [widgetRnCopied, setWidgetRnCopied] = useState(false);
   const [widgetSaving, setWidgetSaving] = useState(false);
   const [widgetSaved, setWidgetSaved] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
@@ -189,6 +190,56 @@ export default function Dashboard() {
     return `<script\n${lines.join("\n")}>\n</script>`;
   };
 
+  const generateReactNativeScript = () => {
+    const supabaseApiBase = (import.meta.env.VITE_PUBLIC_SUPABASE_URL as string) + "/functions/v1";
+    const apiBase = supabaseApiBase && !supabaseApiBase.startsWith("undefined") ? supabaseApiBase : "https://your-project.supabase.co/functions/v1";
+    const partnerId = partnerIdState || "<partner-id>";
+    return [
+      "// React Native API client for OPSConnect",
+      "const OPSCONNECT_API_BASE = '" + apiBase + "';",
+      "",
+      "async function fetchWidgetTopics(partnerId = '" + partnerId + "') {",
+      "  const res = await fetch(`${OPSCONNECT_API_BASE}/widget-init?partner_id=${encodeURIComponent(partnerId)}`);",
+      "  if (!res.ok) throw new Error('Failed to load widget topics');",
+      "  return res.json();",
+      "}",
+      "",
+      "async function sendAiMessage({ partnerId = '" + partnerId + "', message, history = [], lang = 'en' }) {",
+      "  const res = await fetch(`${OPSCONNECT_API_BASE}/ai-chat`, {",
+      "    method: 'POST',",
+      "    headers: { 'Content-Type': 'application/json' },",
+      "    body: JSON.stringify({ partner_id: partnerId, message, history, lang }),",
+      "  });",
+      "  if (!res.ok) throw new Error('AI chat request failed');",
+      "  return res.json();",
+      "}",
+      "",
+      "async function createSupportRequest({ partnerId = '" + partnerId + "', visitorName, visitorContact, message, company, topic }) {",
+      "  const res = await fetch(`${OPSCONNECT_API_BASE}/chat-support`, {",
+      "    method: 'POST',",
+      "    headers: { 'Content-Type': 'application/json' },",
+      "    body: JSON.stringify({",
+      "      partner_id: partnerId,",
+      "      visitor_name: visitorName,",
+      "      visitor_contact: visitorContact,",
+      "      message,",
+      "      company,",
+      "      topic,",
+      "    }),",
+      "  });",
+      "  if (!res.ok) throw new Error('Support request failed');",
+      "  return res.json();",
+      "}",
+      "",
+      "export { fetchWidgetTopics, sendAiMessage, createSupportRequest };",
+      "",
+      "// Example usage:",
+      "// const topics = await fetchWidgetTopics();",
+      "// const aiResponse = await sendAiMessage({ message: 'Hello', history: [] });",
+      "// await createSupportRequest({ visitorName: 'Jane Doe', visitorContact: 'jane@example.com', message: 'Need help', company: '', topic: '' });",
+    ].join("\n");
+  };
+
   const handleCopyEmbed = async () => {
     const code = generateEmbedCode();
     try {
@@ -205,6 +256,23 @@ export default function Dashboard() {
     }
     setWidgetCopied(true);
     setTimeout(() => setWidgetCopied(false), 2000);
+  };
+
+  const handleCopyReactNativeScript = async () => {
+    const code = generateReactNativeScript();
+    try {
+      await navigator.clipboard.writeText(code);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = code;
+      ta.style.cssText = "position:fixed;top:0;left:0;opacity:0;pointer-events:none";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    }
+    setWidgetRnCopied(true);
+    setTimeout(() => setWidgetRnCopied(false), 2000);
   };
 
   const handleTestConnection = (channelId: string) => {
@@ -1002,6 +1070,29 @@ ${date.toISOString().split("T")[0]}
                           </div>
                           <p className="text-xs text-foreground-400 mt-2.5">
                             Paste this just before <code className="bg-background-200 px-1 rounded text-[11px]">&lt;/body&gt;</code> on every page of your website.
+                          </p>
+                        </div>
+
+                        {/* Step 4: React Native API client */}
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-widest text-foreground-400 mb-3">4 — React Native API Client</p>
+                          <p className="text-xs text-foreground-500 mb-3">Copy this generated React Native helper into your mobile app to reuse the same backend APIs.</p>
+                          <div className="relative">
+                            <pre className="bg-foreground-950 text-accent-300 text-[11px] font-mono rounded-xl p-4 overflow-x-auto leading-relaxed whitespace-pre max-h-72">{generateReactNativeScript()}</pre>
+                            <button
+                              onClick={handleCopyReactNativeScript}
+                              className={`absolute top-3 right-3 text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1 ${
+                                widgetRnCopied
+                                  ? "bg-accent-500 text-background-50 dark:text-foreground-950"
+                                  : "bg-background-200/20 text-foreground-200 hover:bg-background-200/40"
+                              }`}
+                            >
+                              <i className={widgetRnCopied ? "ri-checkbox-circle-line" : "ri-file-copy-line"}></i>
+                              {widgetRnCopied ? "Copied!" : "Copy"}
+                            </button>
+                          </div>
+                          <p className="text-xs text-foreground-400 mt-2.5">
+                            Paste this helper into your React Native project and call the exported functions from your chat screen.
                           </p>
                         </div>
 
