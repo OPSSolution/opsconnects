@@ -98,16 +98,15 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Notify all agents of this partner via Telegram
-    const { data: agents } = await supabase
-      .from("partner_agents")
+    // Notify the partner's configured Telegram chat
+    const { data: partner } = await supabase
+      .from("partners")
       .select("name, telegram_chat_id")
       .eq("partner_id", partnerId)
-      .eq("status", "active")
-      .not("telegram_chat_id", "is", null);
+      .maybeSingle();
 
-    if (agents && agents.length > 0) {
-      const preview = initialMsg ? initialMsg.slice(0, 100) + (initialMsg.length > 100 ? "…" : "") : "(no message)";
+    if (partner?.telegram_chat_id) {
+      const preview = initialMsg ? initialMsg.slice(0, 120) + (initialMsg.length > 120 ? "…" : "") : "(no message)";
       const alertText = [
         "🔔 <b>New Live Chat Request</b>",
         "",
@@ -115,9 +114,9 @@ Deno.serve(async (req: Request) => {
         `📞 <b>Contact:</b> ${visitorContact}`,
         `💬 <b>Message:</b> ${preview}`,
         "",
-        `👉 <a href="https://chat.opssolutions.tech/dashboard">Open Dashboard</a>`,
+        `👉 <a href="https://chat.opssolutions.tech/agent">Open Agent Dashboard</a>`,
       ].join("\n");
-      await Promise.all(agents.map((a: { telegram_chat_id: string }) => sendTelegramAlert(a.telegram_chat_id, alertText)));
+      await sendTelegramAlert(partner.telegram_chat_id, alertText);
     }
 
     // Save the AI conversation history so agents see full context

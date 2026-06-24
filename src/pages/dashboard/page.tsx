@@ -53,6 +53,9 @@ export default function Dashboard() {
   const [aiContext, setAiContext] = useState("");
   const [aiContextSaving, setAiContextSaving] = useState(false);
   const [aiContextSaved, setAiContextSaved] = useState(false);
+  const [tgChatId, setTgChatId] = useState("");
+  const [tgSaving, setTgSaving] = useState(false);
+  const [tgSaved, setTgSaved] = useState(false);
 
   useEffect(() => {
     getSession().then(async (session) => {
@@ -64,10 +67,11 @@ export default function Dashboard() {
         if (session.partnerDbId) {
           const { data: pd } = await supabase
             .from("partners")
-            .select("ai_business_context, widget_settings")
+            .select("ai_business_context, widget_settings, telegram_chat_id")
             .eq("id", session.partnerDbId)
             .maybeSingle();
           if (pd?.ai_business_context) setAiContext(pd.ai_business_context as string);
+          if (pd?.telegram_chat_id) setTgChatId(pd.telegram_chat_id as string);
           if (pd?.widget_settings) {
             const ws = pd.widget_settings as Record<string, unknown>;
             if (ws.name)      setWidgetName(ws.name as string);
@@ -244,6 +248,23 @@ export default function Dashboard() {
       showToast("AI context saved!");
     } else {
       showToast("Error saving AI context.");
+    }
+  };
+
+  const saveTgChatId = async () => {
+    if (!partnerDbId) return;
+    setTgSaving(true);
+    const { error } = await supabase
+      .from("partners")
+      .update({ telegram_chat_id: tgChatId || null })
+      .eq("id", partnerDbId);
+    setTgSaving(false);
+    if (!error) {
+      setTgSaved(true);
+      setTimeout(() => setTgSaved(false), 2500);
+      showToast("Telegram alert saved!");
+    } else {
+      showToast("Error saving Telegram alert.");
     }
   };
 
@@ -971,6 +992,58 @@ ${date.toISOString().split("T")[0]}
                       </div>
                     </div>
                   )}
+                </div>
+
+                {/* Telegram Notifications */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <h2 className="font-heading text-lg font-bold text-foreground-950">Live Chat Notifications</h2>
+                      <p className="text-xs text-foreground-500 mt-0.5">Get a Telegram alert the moment a visitor requests live support</p>
+                    </div>
+                    <i className="ri-telegram-line text-2xl text-[#26A5E4]" />
+                  </div>
+                  <div className="bg-background-100 border border-background-200/70 rounded-2xl p-5 space-y-4">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-widest text-foreground-400 mb-3">Setup — 2 steps</p>
+                      <ol className="text-xs text-foreground-600 space-y-2 mb-4">
+                        <li><span className="font-semibold text-foreground-800">1.</span> Open Telegram → start a chat with{" "}
+                          <a href="https://t.me/OPSConnectAlertBot" target="_blank" rel="noreferrer" className="text-[#26A5E4] font-semibold hover:underline">@OPSConnectAlertBot</a>
+                          {" "}→ tap <b>Start</b>. The bot replies with your Chat ID.
+                        </li>
+                        <li><span className="font-semibold text-foreground-800">2.</span> Paste the Chat ID below and click Save. Done — you'll get alerts for every new live chat.</li>
+                      </ol>
+                      <p className="text-xs text-foreground-500 mb-2">
+                        💡 <b>Tip:</b> You can also use a <b>Telegram Group</b> — add the bot to your group, send any message, then paste the group's Chat ID (starts with <code className="bg-background-200 px-1 rounded">-</code>).
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-foreground-600 block mb-1.5">Telegram Chat ID</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={tgChatId}
+                          onChange={(e) => setTgChatId(e.target.value)}
+                          placeholder="e.g. 8434458850  or  -1001234567890 (group)"
+                          className="flex-1 bg-background-50 border border-background-200/70 rounded-lg px-3 py-2 text-sm text-foreground-800 outline-none focus:border-primary-400 placeholder:text-foreground-300"
+                        />
+                        <button
+                          onClick={saveTgChatId}
+                          disabled={tgSaving}
+                          className={`text-xs font-semibold px-4 py-2 rounded-lg transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50 ${
+                            tgSaved ? "bg-green-500 text-white" : "bg-primary-500 text-white hover:bg-primary-600"
+                          }`}
+                        >
+                          {tgSaving ? "Saving…" : tgSaved ? "✓ Saved!" : "Save"}
+                        </button>
+                      </div>
+                      {tgChatId && (
+                        <p className="text-[11px] text-green-600 mt-1.5 flex items-center gap-1">
+                          <i className="ri-checkbox-circle-line" /> Telegram alerts active for this account
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Website Widget Generator */}
