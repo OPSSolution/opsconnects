@@ -450,11 +450,15 @@ export default function AgentDashboard() {
               <p className="text-xs font-semibold uppercase tracking-widest text-foreground-400 mb-3">Telegram Alerts</p>
               <p className="text-xs text-foreground-500 mb-3">
                 Get instant notifications when a visitor starts a live chat.
-                <br />
-                1. Open Telegram → search <span className="font-mono bg-background-100 px-1 rounded">@OPSConnectAlertBot</span> → tap <b>Start</b>
-                <br />
-                2. The bot replies with your Chat ID — paste it below.
               </p>
+              <ol className="text-xs text-foreground-500 space-y-1.5 mb-3 list-none">
+                <li>1. Open Telegram →{" "}
+                  <a href="https://t.me/OPSConnectAlertBot" target="_blank" rel="noreferrer" className="text-primary-600 font-semibold hover:underline">
+                    @OPSConnectAlertBot
+                  </a>{" "}→ tap <b>Start</b>
+                </li>
+                <li>2. The bot replies with your <b>Chat ID</b> — paste it below.</li>
+              </ol>
               <label className="text-xs font-medium text-foreground-600 block mb-1">Your Telegram Chat ID</label>
               <div className="flex gap-2">
                 <input
