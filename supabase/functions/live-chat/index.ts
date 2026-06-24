@@ -1,7 +1,17 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const SUPABASE_URL             = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_URL              = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const TELEGRAM_BOT_TOKEN        = Deno.env.get("TELEGRAM_BOT_TOKEN");
+
+async function sendTelegramAlert(chatId: string, text: string) {
+  if (!TELEGRAM_BOT_TOKEN) return;
+  await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" }),
+  });
+};
 
 const CORS = {
   "Access-Control-Allow-Origin":  "*",
@@ -86,6 +96,28 @@ Deno.serve(async (req: Request) => {
         JSON.stringify({ error: chatErr?.message ?? "Failed to create chat" }),
         { status: 500, headers: CORS }
       );
+    }
+
+    // Notify all agents of this partner via Telegram
+    const { data: agents } = await supabase
+      .from("partner_agents")
+      .select("name, telegram_chat_id")
+      .eq("partner_id", partnerId)
+      .eq("status", "active")
+      .not("telegram_chat_id", "is", null);
+
+    if (agents && agents.length > 0) {
+      const preview = initialMsg ? initialMsg.slice(0, 100) + (initialMsg.length > 100 ? "…" : "") : "(no message)";
+      const alertText = [
+        "🔔 <b>New Live Chat Request</b>",
+        "",
+        `👤 <b>Visitor:</b> ${visitorName}`,
+        `📞 <b>Contact:</b> ${visitorContact}`,
+        `💬 <b>Message:</b> ${preview}`,
+        "",
+        `👉 <a href="https://chat.opssolutions.tech/dashboard">Open Dashboard</a>`,
+      ].join("\n");
+      await Promise.all(agents.map((a: { telegram_chat_id: string }) => sendTelegramAlert(a.telegram_chat_id, alertText)));
     }
 
     // Save the AI conversation history so agents see full context

@@ -35,18 +35,33 @@ export default function AgentDashboard() {
   const [reply, setReply]             = useState("");
   const [sending, setSending]         = useState(false);
   const [filter, setFilter]           = useState<"waiting" | "active" | "all">("waiting");
-  const [showChat, setShowChat]       = useState(false); // mobile: list vs chat view
+  const [showChat, setShowChat]       = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [telegramChatId, setTelegramChatId] = useState("");
+  const [savingTg, setSavingTg]       = useState(false);
+  const [tgSaved, setTgSaved]         = useState(false);
+  const [agentDbId, setAgentDbId]     = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollRef        = useRef<ReturnType<typeof setInterval> | null>(null);
   const textareaRef    = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    getSession().then((s) => {
+    getSession().then(async (s) => {
       if (!s) { navigate("/login", { replace: true }); return; }
       if (s.role !== "agent") { navigate(s.role === "admin" ? "/admin" : s.role === "viewer" ? "/viewer" : "/dashboard", { replace: true }); return; }
       setAgentName(s.agentName ?? s.email);
       setPartnerId(s.partnerId);
       setPartnerName(s.partnerName);
+      // Load agent's telegram_chat_id
+      const { data: agentRow } = await supabase
+        .from("partner_agents")
+        .select("id, telegram_chat_id")
+        .eq("email", s.email)
+        .maybeSingle();
+      if (agentRow) {
+        setAgentDbId(agentRow.id);
+        if (agentRow.telegram_chat_id) setTelegramChatId(agentRow.telegram_chat_id);
+      }
     });
   }, [navigate]);
 
@@ -140,6 +155,15 @@ export default function AgentDashboard() {
       e.preventDefault();
       sendReply();
     }
+  };
+
+  const saveTelegramChatId = async () => {
+    if (!agentDbId) return;
+    setSavingTg(true);
+    await supabase.from("partner_agents").update({ telegram_chat_id: telegramChatId || null }).eq("id", agentDbId);
+    setSavingTg(false);
+    setTgSaved(true);
+    setTimeout(() => setTgSaved(false), 2500);
   };
 
   const handleSignOut = async () => {
@@ -389,6 +413,13 @@ export default function AgentDashboard() {
             <span className="text-xs text-foreground-600 font-medium truncate max-w-[100px] sm:max-w-none">{agentName}</span>
           </span>
           <button
+            onClick={() => setShowSettings(true)}
+            className="text-xs text-foreground-400 hover:text-foreground-700 transition-colors cursor-pointer p-1.5 rounded-md border border-background-200/70 flex-shrink-0"
+            title="Settings"
+          >
+            <i className="ri-settings-3-line text-base" />
+          </button>
+          <button
             onClick={handleSignOut}
             className="text-xs text-foreground-400 hover:text-foreground-700 transition-colors cursor-pointer px-2.5 py-1.5 rounded-md border border-background-200/70 flex-shrink-0"
           >
@@ -402,6 +433,60 @@ export default function AgentDashboard() {
         {ChatList}
         {ChatWindow}
       </div>
+
+      {/* Settings modal */}
+      {showSettings && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={() => setShowSettings(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-base font-bold text-foreground-900">Agent Settings</h2>
+              <button onClick={() => setShowSettings(false)} className="text-foreground-400 hover:text-foreground-700 cursor-pointer">
+                <i className="ri-close-line text-xl" />
+              </button>
+            </div>
+
+            {/* Telegram section */}
+            <div className="mb-5">
+              <p className="text-xs font-semibold uppercase tracking-widest text-foreground-400 mb-3">Telegram Alerts</p>
+              <p className="text-xs text-foreground-500 mb-3">
+                Get instant notifications when a visitor starts a live chat.
+                <br />
+                1. Open Telegram → search <span className="font-mono bg-background-100 px-1 rounded">@OPSConnectAlertBot</span> → tap <b>Start</b>
+                <br />
+                2. The bot replies with your Chat ID — paste it below.
+              </p>
+              <label className="text-xs font-medium text-foreground-600 block mb-1">Your Telegram Chat ID</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={telegramChatId}
+                  onChange={(e) => setTelegramChatId(e.target.value)}
+                  placeholder="e.g. 123456789"
+                  className="flex-1 bg-background-50 border border-background-200/70 rounded-lg px-3 py-2 text-sm text-foreground-800 outline-none focus:border-primary-400 placeholder:text-foreground-300"
+                />
+                <button
+                  onClick={saveTelegramChatId}
+                  disabled={savingTg}
+                  className={`text-xs font-semibold px-4 py-2 rounded-lg transition-colors cursor-pointer whitespace-nowrap ${
+                    tgSaved ? "bg-green-500 text-white" : "bg-primary-500 text-white hover:bg-primary-600"
+                  } disabled:opacity-50`}
+                >
+                  {savingTg ? "Saving…" : tgSaved ? "✓ Saved" : "Save"}
+                </button>
+              </div>
+              {telegramChatId && (
+                <p className="text-[11px] text-green-600 mt-2 flex items-center gap-1">
+                  <i className="ri-checkbox-circle-line" /> Telegram alerts active
+                </p>
+              )}
+            </div>
+
+            <div className="border-t border-background-200/70 pt-4">
+              <p className="text-xs text-foreground-400">Signed in as <span className="font-medium text-foreground-700">{agentName}</span></p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
