@@ -101,7 +101,7 @@ Deno.serve(async (req: Request) => {
     // Notify the partner's configured Telegram chat
     const { data: partner } = await supabase
       .from("partners")
-      .select("name, telegram_chat_id")
+      .select("partner_name, telegram_chat_id")
       .eq("partner_id", partnerId)
       .maybeSingle();
 
