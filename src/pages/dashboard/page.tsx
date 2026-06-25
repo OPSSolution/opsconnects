@@ -53,7 +53,9 @@ export default function Dashboard() {
   const [aiContext, setAiContext] = useState("");
   const [aiContextSaving, setAiContextSaving] = useState(false);
   const [aiContextSaved, setAiContextSaved] = useState(false);
+  const [tgBotToken, setTgBotToken] = useState("");
   const [tgChatId, setTgChatId] = useState("");
+  const [tgFinding, setTgFinding] = useState(false);
   const [tgSaving, setTgSaving] = useState(false);
   const [tgSaved, setTgSaved] = useState(false);
 
@@ -67,10 +69,11 @@ export default function Dashboard() {
         if (session.partnerDbId) {
           const { data: pd } = await supabase
             .from("partners")
-            .select("ai_business_context, widget_settings, telegram_chat_id")
+            .select("ai_business_context, widget_settings, telegram_bot_token, telegram_chat_id")
             .eq("id", session.partnerDbId)
             .maybeSingle();
           if (pd?.ai_business_context) setAiContext(pd.ai_business_context as string);
+          if (pd?.telegram_bot_token) setTgBotToken(pd.telegram_bot_token as string);
           if (pd?.telegram_chat_id) setTgChatId(pd.telegram_chat_id as string);
           if (pd?.widget_settings) {
             const ws = pd.widget_settings as Record<string, unknown>;
@@ -251,12 +254,29 @@ export default function Dashboard() {
     }
   };
 
+  const findTgChatId = async () => {
+    if (!tgBotToken.trim()) { showToast("Enter your Bot Token first."); return; }
+    setTgFinding(true);
+    try {
+      const res = await fetch(`https://api.telegram.org/bot${tgBotToken.trim()}/getUpdates`);
+      const json = await res.json() as { ok: boolean; result: { message?: { chat: { id: number } } }[] };
+      if (!json.ok || json.result.length === 0) {
+        showToast("No messages found. Send any message to your bot first, then try again.");
+      } else {
+        const chatId = String(json.result[json.result.length - 1].message?.chat.id ?? "");
+        if (chatId) { setTgChatId(chatId); showToast("Chat ID found: " + chatId); }
+        else showToast("Could not read Chat ID. Make sure you messaged your bot.");
+      }
+    } catch { showToast("Failed to contact Telegram. Check your bot token."); }
+    setTgFinding(false);
+  };
+
   const saveTgChatId = async () => {
     if (!partnerDbId) return;
     setTgSaving(true);
     const { error } = await supabase
       .from("partners")
-      .update({ telegram_chat_id: tgChatId || null })
+      .update({ telegram_bot_token: tgBotToken || null, telegram_chat_id: tgChatId || null })
       .eq("id", partnerDbId);
     setTgSaving(false);
     if (!error) {
@@ -1003,45 +1023,63 @@ ${date.toISOString().split("T")[0]}
                     </div>
                     <i className="ri-telegram-line text-2xl text-[#26A5E4]" />
                   </div>
-                  <div className="bg-background-100 border border-background-200/70 rounded-2xl p-5 space-y-4">
+                  <div className="bg-background-100 border border-background-200/70 rounded-2xl p-5 space-y-5">
+                    {/* Step 1 */}
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-widest text-foreground-400 mb-3">Setup — 2 steps</p>
-                      <ol className="text-xs text-foreground-600 space-y-2 mb-4">
-                        <li><span className="font-semibold text-foreground-800">1.</span> Open Telegram → start a chat with{" "}
-                          <a href="https://t.me/OPSConnectAlertBot" target="_blank" rel="noreferrer" className="text-[#26A5E4] font-semibold hover:underline">@OPSConnectAlertBot</a>
-                          {" "}→ tap <b>Start</b>. The bot replies with your Chat ID.
-                        </li>
-                        <li><span className="font-semibold text-foreground-800">2.</span> Paste the Chat ID below and click Save. Done — you'll get alerts for every new live chat.</li>
-                      </ol>
+                      <p className="text-xs font-semibold uppercase tracking-widest text-foreground-400 mb-2">Step 1 — Create your bot</p>
                       <p className="text-xs text-foreground-500 mb-2">
-                        💡 <b>Tip:</b> You can also use a <b>Telegram Group</b> — add the bot to your group, send any message, then paste the group's Chat ID (starts with <code className="bg-background-200 px-1 rounded">-</code>).
+                        Open Telegram → search <span className="font-semibold text-foreground-700">@BotFather</span> → send <code className="bg-background-200 px-1 rounded">/newbot</code> → follow the steps → copy the <b>Bot Token</b> it gives you.
                       </p>
+                      <label className="text-xs font-medium text-foreground-600 block mb-1.5">Bot Token</label>
+                      <input
+                        type="text"
+                        value={tgBotToken}
+                        onChange={(e) => setTgBotToken(e.target.value)}
+                        placeholder="e.g. 123456789:AAFxxxxxxxxxxxxxxxxxxxxxxxx"
+                        className="w-full bg-background-50 border border-background-200/70 rounded-lg px-3 py-2 text-sm text-foreground-800 outline-none focus:border-primary-400 placeholder:text-foreground-300 font-mono"
+                      />
                     </div>
+                    {/* Step 2 */}
                     <div>
-                      <label className="text-xs font-medium text-foreground-600 block mb-1.5">Telegram Chat ID</label>
+                      <p className="text-xs font-semibold uppercase tracking-widest text-foreground-400 mb-2">Step 2 — Get your Chat ID</p>
+                      <p className="text-xs text-foreground-500 mb-2">
+                        Open your new bot in Telegram → send any message (e.g. "hi") → then click <b>Find my Chat ID</b> below.
+                      </p>
                       <div className="flex gap-2">
                         <input
                           type="text"
                           value={tgChatId}
                           onChange={(e) => setTgChatId(e.target.value)}
-                          placeholder="e.g. 8434458850  or  -1001234567890 (group)"
+                          placeholder="Auto-filled after clicking Find, or paste manually"
                           className="flex-1 bg-background-50 border border-background-200/70 rounded-lg px-3 py-2 text-sm text-foreground-800 outline-none focus:border-primary-400 placeholder:text-foreground-300"
                         />
                         <button
-                          onClick={saveTgChatId}
-                          disabled={tgSaving}
-                          className={`text-xs font-semibold px-4 py-2 rounded-lg transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50 ${
-                            tgSaved ? "bg-green-500 text-white" : "bg-primary-500 text-white hover:bg-primary-600"
-                          }`}
+                          onClick={findTgChatId}
+                          disabled={tgFinding || !tgBotToken.trim()}
+                          className="text-xs font-semibold px-3 py-2 rounded-lg border border-primary-400 text-primary-600 hover:bg-primary-50 transition-colors cursor-pointer whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
                         >
-                          {tgSaving ? "Saving…" : tgSaved ? "✓ Saved!" : "Save"}
+                          {tgFinding ? <><span className="w-3 h-3 border-2 border-primary-400 border-t-transparent rounded-full animate-spin" />Finding…</> : <><i className="ri-search-line" />Find my Chat ID</>}
                         </button>
                       </div>
-                      {tgChatId && (
-                        <p className="text-[11px] text-green-600 mt-1.5 flex items-center gap-1">
-                          <i className="ri-checkbox-circle-line" /> Telegram alerts active for this account
-                        </p>
-                      )}
+                      <p className="text-[11px] text-foreground-400 mt-1.5">💡 For a group: add your bot to the group, send a message, then click Find.</p>
+                    </div>
+                    {/* Step 3 */}
+                    <div className="flex items-center justify-between pt-1 border-t border-background-200/70">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-widest text-foreground-400 mb-0.5">Step 3 — Save</p>
+                        {tgBotToken && tgChatId && (
+                          <p className="text-[11px] text-green-600 flex items-center gap-1"><i className="ri-checkbox-circle-line" /> Ready — alerts will fire on every live chat request</p>
+                        )}
+                      </div>
+                      <button
+                        onClick={saveTgChatId}
+                        disabled={tgSaving || !tgBotToken.trim() || !tgChatId.trim()}
+                        className={`text-xs font-semibold px-5 py-2 rounded-lg transition-colors cursor-pointer whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed ${
+                          tgSaved ? "bg-green-500 text-white" : "bg-primary-500 text-white hover:bg-primary-600"
+                        }`}
+                      >
+                        {tgSaving ? "Saving…" : tgSaved ? "✓ Saved!" : "Save"}
+                      </button>
                     </div>
                   </div>
                 </div>

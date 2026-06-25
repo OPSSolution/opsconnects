@@ -2,11 +2,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL              = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const TELEGRAM_BOT_TOKEN        = Deno.env.get("TELEGRAM_BOT_TOKEN");
 
-async function sendTelegramAlert(chatId: string, text: string) {
-  if (!TELEGRAM_BOT_TOKEN) return;
-  await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+async function sendTelegramAlert(botToken: string, chatId: string, text: string) {
+  await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" }),
@@ -98,14 +96,14 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Notify the partner's configured Telegram chat
+    // Notify via partner's own Telegram bot
     const { data: partner } = await supabase
       .from("partners")
-      .select("partner_name, telegram_chat_id")
+      .select("partner_name, telegram_bot_token, telegram_chat_id")
       .eq("partner_id", partnerId)
       .maybeSingle();
 
-    if (partner?.telegram_chat_id) {
+    if (partner?.telegram_bot_token && partner?.telegram_chat_id) {
       const preview = initialMsg ? initialMsg.slice(0, 120) + (initialMsg.length > 120 ? "…" : "") : "(no message)";
       const alertText = [
         "🔔 <b>New Live Chat Request</b>",
@@ -116,7 +114,7 @@ Deno.serve(async (req: Request) => {
         "",
         `👉 <a href="https://chat.opssolutions.tech/agent">Open Agent Dashboard</a>`,
       ].join("\n");
-      await sendTelegramAlert(partner.telegram_chat_id, alertText);
+      await sendTelegramAlert(partner.telegram_bot_token, partner.telegram_chat_id, alertText);
     }
 
     // Save the AI conversation history so agents see full context
