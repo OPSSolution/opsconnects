@@ -701,16 +701,18 @@
     pendingTopics = null;
   }
 
-  function fetchTopics() {
-    if (!cfg.api || !cfg.partnerId) return;
+  function fetchTopics(onReady) {
+    if (!cfg.api || !cfg.partnerId) { if (onReady) onReady(null); return; }
     fetch(cfg.api + '/widget-init?partner_id=' + encodeURIComponent(cfg.partnerId))
       .then(function (r) { return r.json(); })
       .then(function (data) {
         var topics = data.topics || [];
-        if (!topics.length) return;
-        if (aiStarted) { showChips(topics); } else { pendingTopics = topics; }
+        if (topics.length) {
+          if (aiStarted) { showChips(topics); } else { pendingTopics = topics; }
+        }
+        if (onReady) onReady(data.greeting || null);
       })
-      .catch(function () {});
+      .catch(function () { if (onReady) onReady(null); });
   }
 
   // ── Tab switching ─────────────────────────────────────────────────
@@ -904,13 +906,20 @@
     if (isOpen) {
       if (!aiStarted && activeTab === 'ai') {
         aiStarted = true;
-        fetchTopics();
-        botSay(aiMsgs, t('greeting', { name: cfg.name }), function () {
-          aiInp.disabled = false;
-          aiSnd.disabled = false;
-          aiInp.focus();
-          if (pendingTopics) { showChips(pendingTopics); pendingTopics = null; }
-        });
+        var _td = showDots(aiMsgs);
+        var _done = false;
+        function _showGreeting(g) {
+          if (_done) return; _done = true;
+          rmDots(_td);
+          botSay(aiMsgs, g || t('greeting', { name: cfg.name }), function () {
+            aiInp.disabled = false;
+            aiSnd.disabled = false;
+            aiInp.focus();
+            if (pendingTopics) { showChips(pendingTopics); pendingTopics = null; }
+          });
+        }
+        var _gt = setTimeout(function () { _showGreeting(null); }, 2000);
+        fetchTopics(function (g) { clearTimeout(_gt); _showGreeting(g); });
       } else if (activeTab === 'ai' && !aiInp.disabled) {
         aiInp.focus();
       }

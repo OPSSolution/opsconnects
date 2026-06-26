@@ -478,36 +478,6 @@
   });
 
   /* ── Topic chips ── */
-  function loadTopics() {
-    if (!cfg.api || !cfg.partnerId) return;
-    fetch(cfg.api + '/widget-init?partner_id=' + encodeURIComponent(cfg.partnerId))
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        var topics = data.topics || [];
-        if (!topics.length) return;
-        chipsEl.innerHTML = '';
-        var activeChip = null;
-        topics.forEach(function (topic) {
-          var label   = typeof topic === 'string' ? topic : topic.label;
-          var content = typeof topic === 'string' ? null  : topic.content;
-          var btn = document.createElement('button');
-          btn.className = 'chip';
-          btn.textContent = label;
-          btn.addEventListener('click', function () {
-            if (activeChip) activeChip.classList.remove('active');
-            activeChip = btn; btn.classList.add('active');
-            addMsg(aiMsgs, label, 'msg-user');
-            if (content) {
-              var d = showDots(aiMsgs);
-              setTimeout(function () { d.remove(); addMsg(aiMsgs, content, 'msg-bot'); }, 600);
-            }
-          });
-          chipsEl.appendChild(btn);
-        });
-        chipsEl.style.display = 'flex';
-      })
-      .catch(function () {});
-  }
 
   /* ── AI chat ── */
   function sendAI() {
@@ -634,10 +604,52 @@
   lvSnd.addEventListener('click', sendLv);
   lvInp.addEventListener('keydown', function (e) { if (e.key === 'Enter') sendLv(); });
 
-  /* ── Boot ── */
-  loadTopics();
-  botSay(aiMsgs, 'Hi! I\'m the AI assistant for ' + cfg.name + '. How can I help you today?')
-    .then(function () { setAiReady(true); });
+  /* ── Boot: load greeting + topics from widget-init ── */
+  var _greetDone = false;
+  var _greetTimer = setTimeout(function () {
+    if (_greetDone) return; _greetDone = true;
+    botSay(aiMsgs, 'Hi! I\'m the AI assistant for ' + cfg.name + '. How can I help you today?')
+      .then(function () { setAiReady(true); });
+  }, 2000);
+
+  if (cfg.api && cfg.partnerId) {
+    fetch(cfg.api + '/widget-init?partner_id=' + encodeURIComponent(cfg.partnerId))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        clearTimeout(_greetTimer);
+        /* Render chips */
+        var topics = data.topics || [];
+        if (topics.length) {
+          chipsEl.innerHTML = '';
+          var activeChip = null;
+          topics.forEach(function (topic) {
+            var label   = typeof topic === 'string' ? topic : topic.label;
+            var content = typeof topic === 'string' ? null  : topic.content;
+            var btn = document.createElement('button');
+            btn.className = 'chip';
+            btn.textContent = label;
+            btn.addEventListener('click', function () {
+              if (activeChip) activeChip.classList.remove('active');
+              activeChip = btn; btn.classList.add('active');
+              addMsg(aiMsgs, label, 'msg-user');
+              if (content) {
+                var d = showDots(aiMsgs);
+                setTimeout(function () { d.remove(); addMsg(aiMsgs, content, 'msg-bot'); }, 600);
+              }
+            });
+            chipsEl.appendChild(btn);
+          });
+          chipsEl.style.display = 'flex';
+        }
+        /* Show partner's custom greeting, or fall back to default */
+        if (_greetDone) return; _greetDone = true;
+        var greeting = data.greeting || ('Hi! I\'m the AI assistant for ' + cfg.name + '. How can I help you today?');
+        botSay(aiMsgs, greeting).then(function () { setAiReady(true); });
+      })
+      .catch(function () {
+        /* widget-init failed — fall back already handled by timer */
+      });
+  }
 })();
 </script>
 </body>
