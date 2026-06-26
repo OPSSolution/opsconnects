@@ -44,8 +44,8 @@ Deno.serve(async (req: Request) => {
       "Authorization": `Bearer ${GROQ_API_KEY}`,
     },
     body: JSON.stringify({
-      model:       "llama-3.1-8b-instant",
-      max_tokens:  500,
+      model:       "llama-3.3-70b-versatile",
+      max_tokens:  600,
       temperature: 0,
       messages: [
         {
@@ -54,22 +54,19 @@ Deno.serve(async (req: Request) => {
         },
         {
           role:    "user",
-          content: `You are setting up a chat widget for ${partnerName}. Using their business information below:
+          content: `You are setting up a chat widget for "${partnerName}". Read their business information below carefully.
 
-1. Write a short, friendly greeting the AI assistant should say when the chat opens (1–2 sentences, mention the business name, hint at what you can help with, use 1 emoji).
-2. Extract 4–6 quick-topic chips a customer might click (short labels + helpful answers).
+Tasks:
+1. Write a short, friendly GREETING (1–2 sentences) the AI assistant says when the chat opens. Mention the business name, hint at 2–3 key things you can help with, add 1 relevant emoji. Do NOT use placeholder text.
+2. Extract 4–6 TOPIC CHIPS a customer might click. Each chip needs:
+   - "label": 2–4 word button text
+   - "content": the actual helpful answer from the business info (include real phone numbers, emails, URLs from the text — never invent URLs)
 
 Business info:
 ${context}
 
-Return ONLY this JSON structure:
-{
-  "greeting": "Hi there! 👋 I'm ${partnerName}'s AI assistant. I can help you with shopping, orders, and more!",
-  "topics": [
-    {"label": "Shop Products", "content": "Browse our products at https://example.com/shop"},
-    {"label": "Track Order",   "content": "You can track your order at https://example.com/track"}
-  ]
-}`,
+Return ONLY valid JSON (no markdown, no code block):
+{"greeting":"...","topics":[{"label":"...","content":"..."}]}`,
         },
       ],
     }),
@@ -82,11 +79,13 @@ Return ONLY this JSON structure:
     const aiData = await apiRes.json() as { choices?: Array<{ message?: { content?: string } }> };
     const raw    = aiData.choices?.[0]?.message?.content ?? "{}";
     try {
-      const match = raw.match(/\{[\s\S]*\}/);
+      // Strip markdown code fences if present
+      const cleaned = raw.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+      const match = cleaned.match(/\{[\s\S]*\}/);
       if (match) {
         const parsed = JSON.parse(match[0]) as { greeting?: string; topics?: Topic[] };
         greeting = parsed.greeting ?? null;
-        topics   = parsed.topics   ?? [];
+        topics   = Array.isArray(parsed.topics) ? parsed.topics : [];
       }
     } catch { /* return empty */ }
   }
