@@ -61,7 +61,7 @@ export function OPSConnectWidget({
     'email=' + encodeURIComponent(email),
   ].join('&');
 
-  const uri = baseUrl + '/widget-mobile.html?' + qs;
+  const uri = baseUrl + '/mobile-chat.html?' + qs;
 
   const onMessage = (event: WebViewMessageEvent) => {
     try {
