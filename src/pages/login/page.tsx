@@ -129,14 +129,14 @@ export default function Login() {
               </button>
             </form>
 
-            <div className="mt-5 pt-5 border-t border-background-200/70">
+            {/* <div className="mt-5 pt-5 border-t border-background-200/70">
               <p className="text-xs text-foreground-400 text-center mb-3">Admin access</p>
               <div className="bg-background-200/50 rounded-lg px-4 py-3 text-center">
                 <code className="text-xs text-foreground-600 font-mono">{ADMIN_EMAIL}</code>
                 <span className="text-foreground-300 mx-2">·</span>
                 <code className="text-xs text-foreground-600 font-mono">{ADMIN_PASSWORD}</code>
               </div>
-            </div>
+            </div> */}
           </div>
 
           <p className="text-center text-xs text-foreground-400 mt-5">
