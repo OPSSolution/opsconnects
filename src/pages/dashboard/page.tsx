@@ -363,7 +363,8 @@ export default function Dashboard() {
     const pid = partnerIdState || "<your-partner-id>";
     const lines: string[] = [];
     lines.push("// 1. Install: npm install react-native-webview");
-    lines.push("// 2. Copy sdk/react-native/src/OPSConnectWidget.tsx into your project");
+    lines.push("// 2. Save the downloaded file as OPSConnectWidget.tsx in your");
+    lines.push("//    project root — the same folder as App.tsx");
     lines.push("// 3. Use the component:");
     lines.push("");
     lines.push("import React, { useState } from 'react';");
@@ -1425,7 +1426,7 @@ ${date.toISOString().split("T")[0]}
                           <p className="text-xs text-foreground-500 mb-3">
                             Install <code className="bg-background-200 px-1 rounded text-[11px]">react-native-webview</code>, download{" "}
                             <code className="bg-background-200 px-1 rounded text-[11px]">OPSConnectWidget.tsx</code>{" "}
-                            below into your project, then use the snippet below it.
+                            below and save it in your <b>project root — the same folder as App.tsx</b> (or your entry component), then use the snippet below it as-is.
                           </p>
                           <button
                             onClick={handleDownloadReactNativeWidget}
