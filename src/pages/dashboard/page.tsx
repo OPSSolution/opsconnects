@@ -31,6 +31,16 @@ const channelColors: Record<string, string> = {
   livechat: "#1E7FC2", wechat: "#07C160",
 };
 
+// Groups the dashboard's many sections into focused tabs instead of one
+// long scroll: at-a-glance stats/monitoring, connecting/reporting on
+// channels, the actual message inbox, and one-time setup/configuration.
+const DASHBOARD_TABS: { id: "overview" | "channels" | "inbox" | "setup"; label: string; icon: string }[] = [
+  { id: "overview", label: "Overview", icon: "ri-dashboard-line" },
+  { id: "channels", label: "Channels", icon: "ri-plug-line" },
+  { id: "inbox", label: "Inbox", icon: "ri-inbox-line" },
+  { id: "setup", label: "Setup", icon: "ri-settings-3-line" },
+];
+
 export default function Dashboard() {
   const [configuredChannels, setConfiguredChannels] = useState<Set<string>>(new Set());
   const [testStates, setTestStates] = useState<Record<string, TestState>>({});
@@ -39,6 +49,7 @@ export default function Dashboard() {
   const [disconnectModal, setDisconnectModal] = useState<string | null>(null);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [activeAnalyticsChannel, setActiveAnalyticsChannel] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"overview" | "channels" | "inbox" | "setup">("overview");
   const [partnerName, setPartnerName] = useState<string | null>(null);
   const [partnerIdState, setPartnerIdState] = useState<string | null>(null);
   const [partnerDbId, setPartnerDbId] = useState<string | null>(null);
@@ -691,6 +702,25 @@ ${date.toISOString().split("T")[0]}
               </div>
             )}
 
+            {/* Section Tabs */}
+            <div className="flex items-center gap-1.5 mb-6 border-b border-background-200/70 overflow-x-auto">
+              {DASHBOARD_TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-1.5 text-sm font-semibold whitespace-nowrap cursor-pointer px-4 py-2.5 border-b-2 transition-colors ${
+                    activeTab === tab.id
+                      ? "border-primary-500 text-primary-600"
+                      : "border-transparent text-foreground-500 hover:text-foreground-800"
+                  }`}
+                >
+                  <i className={tab.icon}></i> {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {activeTab === "overview" && (
+            <>
             {/* Stats Row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
               {dashboardStats.map((stat) => (
@@ -706,10 +736,14 @@ ${date.toISOString().split("T")[0]}
                 </div>
               ))}
             </div>
+            </>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Left: Connected Channels + Analytics */}
               <div className="lg:col-span-2 space-y-6">
+                {activeTab === "overview" && (
+                <>
                 {/* Connected Channels */}
                 <div>
                   <div className="flex items-center justify-between mb-4">
@@ -892,6 +926,11 @@ ${date.toISOString().split("T")[0]}
                   </div>
                 )}
 
+                </>
+                )}
+
+                {activeTab === "channels" && (
+                <>
                 {/* Available Channels */}
                 {disconnectedArray.length > 0 && (
                   <div>
@@ -986,12 +1025,22 @@ ${date.toISOString().split("T")[0]}
                     )}
                   </div>
                 )}
+                </>
+                )}
+
+                {activeTab === "inbox" && (
+                <>
                 {/* Support Requests — from the embedded chat widget */}
                 <SupportRequests partnerId={partnerIdState} />
 
                 {/* Chat Report */}
                 <ChatReport partnerId={partnerDbId} partnerTextId={partnerIdState} />
 
+                </>
+                )}
+
+                {activeTab === "setup" && (
+                <>
                 {/* AI Chat Setup */}
                 <div>
                   <div className="flex items-center justify-between mb-4">
@@ -1429,6 +1478,8 @@ ${date.toISOString().split("T")[0]}
                       </div>
                     )}
                   </div>
+                )}
+                </>
                 )}
               </div>
 
