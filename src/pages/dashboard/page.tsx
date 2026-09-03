@@ -10,8 +10,15 @@ import ChatReport from "./components/ChatReport";
 import SupportRequests from "./components/SupportRequests";
 import LiveChat from "./components/LiveChat";
 
-type TestState = "idle" | "testing" | "success" | "error";
+type TestState = "idle" | "testing" | "success" | "error" | "unverified";
 type BulkTestEntry = { channelId: string; status: TestState };
+
+// Only Telegram has a stored per-partner credential (telegram_bot_token /
+// telegram_chat_id) that lets us actually send a test message and confirm
+// delivery. Other channels are provisioned at the platform/webhook level —
+// there's no per-partner API key to test against yet, so we're honest about
+// that instead of faking a pass/fail.
+const REAL_TEST_CHANNELS = new Set(["telegram"]);
 
 const channelIcons: Record<string, string> = {
   whatsapp: "ri-whatsapp-line", telegram: "ri-telegram-line", messenger: "ri-messenger-line",
@@ -417,14 +424,36 @@ export default function Dashboard() {
     setTimeout(() => setWidgetRnCopied(false), 2000);
   };
 
-  const handleTestConnection = (channelId: string) => {
+  // Sends a real Telegram message via the partner's saved bot token and
+  // records it in `messages`. Returns whether it actually succeeded.
+  const testTelegramChannel = useCallback(async (): Promise<{ ok: boolean; error?: string }> => {
+    if (!partnerDbId) return { ok: false, error: "Partner not loaded yet." };
+    const { data, error } = await supabase.functions.invoke("test-telegram-channel", {
+      body: { partner_id: partnerDbId },
+    });
+    if (error) return { ok: false, error: error.message };
+    return data as { ok: boolean; error?: string };
+  }, [partnerDbId]);
+
+  const handleTestConnection = async (channelId: string) => {
+    const channel = partnerChannels.find((ch) => ch.id === channelId);
     setTestStates((prev) => ({ ...prev, [channelId]: "testing" }));
-    setTimeout(() => {
-      setTestStates((prev) => ({ ...prev, [channelId]: "success" }));
-      const channel = partnerChannels.find((ch) => ch.id === channelId);
-      showToast(`Test message sent through ${channel?.name || "channel"} successfully!`);
-      setTimeout(() => { setTestStates((prev) => { const next = { ...prev }; delete next[channelId]; return next; }); }, 3000);
-    }, 1200 + Math.random() * 800);
+
+    if (REAL_TEST_CHANNELS.has(channelId)) {
+      const result = await testTelegramChannel();
+      setTestStates((prev) => ({ ...prev, [channelId]: result.ok ? "success" : "error" }));
+      showToast(
+        result.ok
+          ? `Test message sent through ${channel?.name || "channel"} successfully!`
+          : (result.error || `Test failed for ${channel?.name || "channel"}.`)
+      );
+    } else {
+      // No stored credential to test against for this channel yet — say so
+      // honestly instead of faking a result.
+      setTestStates((prev) => ({ ...prev, [channelId]: "unverified" }));
+      showToast(`Automatic testing isn't available for ${channel?.name || "this channel"} yet — send a real message to confirm it's working.`);
+    }
+    setTimeout(() => { setTestStates((prev) => { const next = { ...prev }; delete next[channelId]; return next; }); }, 3000);
   };
 
   const handleBulkTestAll = useCallback(() => {
@@ -434,25 +463,39 @@ export default function Dashboard() {
     setBulkTest({ running: true, entries });
 
     const runSequential = async () => {
+      let verified = 0;
+      let unverified = 0;
       for (let i = 0; i < entries.length; i++) {
         setBulkTest((prev) => {
           const updated = [...prev.entries];
           updated[i] = { ...updated[i], status: "testing" };
           return { ...prev, entries: updated };
         });
-        await new Promise((r) => setTimeout(r, 1000 + Math.random() * 600));
+
+        let status: TestState;
+        if (REAL_TEST_CHANNELS.has(entries[i].channelId)) {
+          const result = await testTelegramChannel();
+          status = result.ok ? "success" : "error";
+          if (result.ok) verified++;
+        } else {
+          status = "unverified";
+          unverified++;
+        }
+
         setBulkTest((prev) => {
           const updated = [...prev.entries];
-          updated[i] = { ...updated[i], status: Math.random() > 0.1 ? "success" : "error" };
+          updated[i] = { ...updated[i], status };
           return { ...prev, entries: updated };
         });
       }
       setBulkTest((prev) => ({ ...prev, running: false }));
-      const passed = entries.filter((e) => e.status !== "error" || true).length;
-      showToast(`Bulk test complete: ${passed}/${entries.length} channels passed!`);
+      showToast(
+        `Bulk test complete: ${verified}/${entries.length} verified` +
+        (unverified > 0 ? `, ${unverified} need manual verification` : "") + "."
+      );
     };
     runSequential();
-  }, [configuredChannels]);
+  }, [configuredChannels, testTelegramChannel]);
 
   const generateReport = (channelId: string): string => {
     const data = monthlyReportData[channelId];
@@ -639,6 +682,7 @@ ${date.toISOString().split("T")[0]}
                           {entry.status === "testing" && <span className="flex items-center gap-1.5 text-xs text-foreground-500"><span className="w-3 h-3 border-2 border-primary-500 border-t-transparent rounded-full animate-spin"/> Testing</span>}
                           {entry.status === "success" && <span className="flex items-center gap-1 text-xs text-accent-600"><i className="ri-checkbox-circle-line"></i> Passed</span>}
                           {entry.status === "error" && <span className="flex items-center gap-1 text-xs text-red-500"><i className="ri-close-circle-line"></i> Failed</span>}
+                          {entry.status === "unverified" && <span className="flex items-center gap-1 text-xs text-amber-600"><i className="ri-question-line"></i> Manual only</span>}
                         </div>
                       </div>
                     );
@@ -716,13 +760,21 @@ ${date.toISOString().split("T")[0]}
                                   className={`text-xs font-medium whitespace-nowrap cursor-pointer px-3 py-1.5 rounded-md transition-colors ${
                                     testState === "success"
                                       ? "bg-accent-100 text-accent-600"
-                                      : "bg-secondary-100 text-secondary-700 hover:bg-secondary-200"
+                                      : testState === "error"
+                                        ? "bg-red-100 text-red-600"
+                                        : testState === "unverified"
+                                          ? "bg-amber-100 text-amber-700"
+                                          : "bg-secondary-100 text-secondary-700 hover:bg-secondary-200"
                                   }`}
                                 >
                                   {testState === "testing" ? (
                                     <span className="flex items-center gap-1.5"><span className="w-3 h-3 border-2 border-secondary-500 border-t-transparent rounded-full animate-spin" /> Testing</span>
                                   ) : testState === "success" ? (
                                     <span className="flex items-center gap-1"><i className="ri-check-line"></i> Passed</span>
+                                  ) : testState === "error" ? (
+                                    <span className="flex items-center gap-1"><i className="ri-close-line"></i> Failed</span>
+                                  ) : testState === "unverified" ? (
+                                    <span className="flex items-center gap-1"><i className="ri-question-line"></i> Manual only</span>
                                   ) : (
                                     <span className="flex items-center gap-1"><i className="ri-send-plane-line text-[10px]"></i> Test</span>
                                   )}

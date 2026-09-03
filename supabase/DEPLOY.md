@@ -47,9 +47,9 @@ send a Supabase JWT — they need `--no-verify-jwt` or the gateway rejects every
 inbound message with 401 before your code (and its own signature checks) ever
 runs. `chat-support`, `ai-chat`, `widget-init`, and `live-chat` are called by
 anonymous website visitors through the public widget for the same reason.
-`create-agent`, `delete-agent`, and `seed-demo-messages` are called by logged-in
-partners from the dashboard, so they keep the default JWT verification (backed
-by their own ownership check inside the function).
+`create-agent`, `delete-agent`, `seed-demo-messages`, and `test-telegram-channel`
+are called by logged-in partners from the dashboard, so they keep the default
+JWT verification (backed by their own ownership check inside the function).
 
 ```bash
 supabase functions deploy webhook-whatsapp  --no-verify-jwt
@@ -65,6 +65,7 @@ supabase functions deploy live-chat     --no-verify-jwt
 supabase functions deploy create-agent
 supabase functions deploy delete-agent
 supabase functions deploy seed-demo-messages
+supabase functions deploy test-telegram-channel
 supabase functions deploy newsletter-subscribe
 ```
 

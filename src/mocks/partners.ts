@@ -106,54 +106,18 @@ export const partnerChannels = [
 ];
 
 export const apiEndpoints = [
-  { method: "POST", path: "/api/v1/messages/send", description: "Send a message to any connected channel" },
-  { method: "GET", path: "/api/v1/conversations", description: "List all conversations across channels" },
-  { method: "POST", path: "/api/v1/webhooks/register", description: "Register a webhook for real-time events" },
-  { method: "GET", path: "/api/v1/contacts", description: "Retrieve unified contact profiles" },
+  { method: "POST", path: "/functions/v1/ai-chat", description: "Get an AI-generated reply for a widget conversation" },
+  { method: "GET", path: "/functions/v1/widget-init", description: "Fetch the AI greeting and topic chips for your widget" },
+  { method: "POST", path: "/functions/v1/live-chat", description: "Start a live chat session, or send a visitor's follow-up message" },
+  { method: "GET", path: "/functions/v1/live-chat", description: "Poll a live chat session for new agent replies" },
 ];
 
-export const embedCodeExample = `<script>
-(function(){
-  if(document.getElementById('_omniWidget'))return;
-  var style=document.createElement('style');
-  style.textContent='._ow_btn{position:fixed;bottom:24px;right:24px;z-index:2147483647;width:56px;height:56px;border-radius:50%;background:#1E7FC2;box-shadow:0 4px 16px rgba(30,127,194,.35);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .2s,box-shadow .2s}'+
-  '._ow_btn:hover{transform:scale(1.08);box-shadow:0 6px 24px rgba(30,127,194,.5)}'+
-  '._ow_btn svg{width:24px;height:24px;fill:#fff}'+
-  '._ow_pnl{position:fixed;bottom:92px;right:24px;z-index:2147483646;width:380px;max-width:calc(100vw-32px);height:520px;max-height:calc(100vh-140px);background:#fff;border-radius:16px;box-shadow:0 8px 40px rgba(0,0,0,.15);display:none;flex-direction:column;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}'+
-  '._ow_pnl._ow_open{display:flex;animation:_ow_in .25s ease}'+
-  '._ow_hdr{background:linear-gradient(135deg,#1B3F73,#2E9FDE);padding:20px;color:#fff;display:flex;align-items:center;gap:12px;flex-shrink:0}'+
-  '._ow_ava{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px}'+
-  '._ow_hdr_info{flex:1}._ow_hdr_info strong{display:block;font-size:14px}._ow_hdr_info span{font-size:11px;opacity:.85}'+
-  '._ow_close{background:none;border:none;color:#fff;font-size:22px;cursor:pointer;padding:4px;opacity:.8;line-height:1}'+
-  '._ow_close:hover{opacity:1}._ow_body{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;background:#f9fafb}'+
-  '._ow_bubble{max-width:85%;padding:10px 14px;border-radius:14px;font-size:13px;line-height:1.5;word-break:break-word}'+
-  '._ow_bot{background:#e5e7eb;color:#1f2937;align-self:flex-start;border-bottom-left-radius:4px}'+
-  '._ow_user{background:#1E7FC2;color:#fff;align-self:flex-end;border-bottom-right-radius:4px}'+
-  '._ow_ftr{display:flex;align-items:center;gap:8px;padding:12px 16px;border-top:1px solid #e5e7eb;flex-shrink:0;background:#fff}'+
-  '._ow_ftr input{flex:1;border:none;outline:none;font-size:13px;padding:10px 0;background:transparent;color:#1f2937}'+
-  '._ow_ftr input::placeholder{color:#9ca3af}'+
-  '._ow_send{width:38px;height:38px;border-radius:50%;background:#1E7FC2;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .2s}'+
-  '._ow_send:hover{background:#FF5722}._ow_send svg{width:16px;height:16px;fill:#fff}'+
-  '@keyframes _ow_in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}';
-  document.head.appendChild(style);
-  var btn=document.createElement('div');btn.className='_ow_btn';btn.id='_omniWidget';
-  btn.innerHTML='<svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.2L4 17.2V4h16v12z"/><path d="M7 9h10v2H7zm0 3h7v2H7z"/></svg>';
-  var pnl=document.createElement('div');pnl.className='_ow_pnl';
-  pnl.innerHTML='<div class="_ow_hdr"><div class="_ow_ava">O</div><div class="_ow_hdr_info"><strong>OPSConnect</strong><span>We reply within minutes</span></div><button class="_ow_close">&times;</button></div><div class="_ow_body"><div class="_ow_bubble _ow_bot">Hi there! 👋 Welcome to OPSConnect. How can we help you today?</div></div><div class="_ow_ftr"><input type="text" placeholder="Type a message..." maxlength="500"><button class="_ow_send"><svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg></button></div>';
-  document.body.appendChild(btn);document.body.appendChild(pnl);
-  var isOpen=false,input=pnl.querySelector('input'),body=pnl.querySelector('._ow_body');
-  function toggle(){isOpen=!isOpen;pnl.classList.toggle('_ow_open',isOpen);btn.innerHTML=isOpen?'<svg viewBox="0 0 24 24" width="24" height="24"><path fill="#fff" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>':'<svg viewBox="0 0 24 24" width="24" height="24"><path fill="#fff" d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.2L4 17.2V4h16v12z"/><path fill="#fff" d="M7 9h10v2H7zm0 3h7v2H7z"/></svg>';if(isOpen)input.focus();}
-  btn.addEventListener('click',toggle);
-  pnl.querySelector('._ow_close').addEventListener('click',function(e){e.stopPropagation();isOpen=false;pnl.classList.remove('_ow_open');btn.innerHTML='<svg viewBox="0 0 24 24" width="24" height="24"><path fill="#fff" d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.2L4 17.2V4h16v12z"/><path fill="#fff" d="M7 9h10v2H7zm0 3h7v2H7z"/></svg>';});
-  function addBubble(txt,isUser){
-    var d=document.createElement('div');d.className='_ow_bubble '+(isUser?'_ow_user':'_ow_bot');d.textContent=txt;body.appendChild(d);body.scrollTop=body.scrollHeight;
-  }
-  function send(){
-    var txt=input.value.trim();if(!txt)return;addBubble(txt,true);input.value='';input.focus();
-    var replies=["Thanks for your message! OPSConnect helps businesses unify all their messaging channels in one place.","That's a great question. OPSConnect supports WhatsApp, Messenger, Instagram, Telegram, LINE, Email, Live Chat, and WeChat — all in one dashboard.","We appreciate your interest in OPSConnect! Our platform includes AI chatbots, shared team inboxes, real-time translation, and advanced analytics.","I'd be happy to help with that. Can you share a bit more detail about what you're looking to set up?","Thanks for reaching out! Setting up channels on OPSConnect takes just a few minutes — check out our Partners page for step-by-step guides."];
-    setTimeout(function(){addBubble(replies[Math.floor(Math.random()*replies.length)],false)},1000+Math.random()*1500);
-  }
-  pnl.querySelector('._ow_send').addEventListener('click',send);
-  input.addEventListener('keydown',function(e){if(e.key==='Enter')send();});
-})();
-<\/script>`;
+// Matches the real snippet generated in the partner dashboard
+// (src/pages/dashboard/page.tsx generateEmbedCode()) — same widget.js,
+// same data attributes. YOUR_PARTNER_ID and YOUR_PROJECT come from your
+// actual dashboard once you sign up.
+export const embedCodeExample = `<script
+  src="https://chat.opssolutions.tech/widget.js"
+  data-partner-id="YOUR_PARTNER_ID"
+  data-api="https://YOUR_PROJECT.supabase.co/functions/v1">
+</script>`;

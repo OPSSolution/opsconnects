@@ -93,7 +93,7 @@ export default function DeveloperResources() {
               </pre>
             </div>
             <p className="mt-3 text-xs text-foreground-400">
-              Paste this snippet just before the closing <code className="text-foreground-600">&lt;/body&gt;</code> tag on any website. The widget is fully self-contained and works immediately — no external dependencies or API keys needed for demo. Customize the accent color directly in the script.
+              Paste this snippet just before the closing <code className="text-foreground-600">&lt;/body&gt;</code> tag on any website. <code className="text-foreground-600">data-partner-id</code> and <code className="text-foreground-600">data-api</code> are filled in for you automatically — grab your exact, ready-to-use snippet from your dashboard after signing up.
             </p>
           </div>
         </div>
