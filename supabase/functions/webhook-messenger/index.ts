@@ -78,7 +78,7 @@ Deno.serve(async (req: Request) => {
         }
 
         // Delivery / read receipts — update existing message status
-        if (event.delivery || event.read) {
+        if ((event.delivery || event.read) && partnerId) {
           const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
           const supabase = createClient(
             Deno.env.get("SUPABASE_URL")!,
@@ -88,13 +88,16 @@ Deno.serve(async (req: Request) => {
           const newStatus  = event.read ? "read" : "delivered";
           const watermark  = event.delivery?.watermark ?? event.read?.watermark;
           if (watermark) {
-            await supabase
+            const { error: statusError } = await supabase
               .from("messages")
               .update({ status: newStatus })
               .eq("channel", "messenger")
-              .eq("partner_id", partnerId ?? "")
+              .eq("partner_id", partnerId)
               .lte("created_at", new Date(watermark).toISOString());
+            if (statusError) console.error("Messenger status update failed:", statusError.message);
           }
+        } else if ((event.delivery || event.read) && !partnerId) {
+          console.error("Messenger status update skipped — no channel_configs mapping for page:", pageId);
         }
       }
     }

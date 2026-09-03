@@ -23,9 +23,9 @@ Deno.serve(async (req: Request) => {
   // partner_id passed as query param when registering the webhook URL
   const partnerId = new URL(req.url).searchParams.get("partner_id") ?? undefined;
 
-  let body!: TelegramUpdate;
+  let body: TelegramUpdate;
   try {
-    body = await req.json();
+    body = (await req.json()) as TelegramUpdate;
   } catch {
     return jsonResponse({ error: "Invalid JSON" }, 400);
   }

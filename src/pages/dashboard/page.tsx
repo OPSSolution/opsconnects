@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
 import Navbar from "@/components/feature/Navbar";
 import Footer from "@/components/feature/Footer";
 import { partnerChannels } from "@/mocks/partners";
-import { dashboardStats, channelMetrics, recentActivity, analyticsTrends, monthlyReportData } from "@/mocks/dashboard";
+import { computeDashboardAnalytics, type MessageRow, type ChannelConfigRow } from "./analytics";
 import { getSession, getPartnerChannels } from "@/utils/auth";
 import { supabase } from "@/utils/supabase/client";
 import ChatReport from "./components/ChatReport";
@@ -58,6 +58,8 @@ export default function Dashboard() {
   const [tgFinding, setTgFinding] = useState(false);
   const [tgSaving, setTgSaving] = useState(false);
   const [tgSaved, setTgSaved] = useState(false);
+  const [liveMessages, setLiveMessages] = useState<MessageRow[]>([]);
+  const [channelConfigRows, setChannelConfigRows] = useState<ChannelConfigRow[]>([]);
 
   useEffect(() => {
     getSession().then(async (session) => {
@@ -123,6 +125,25 @@ export default function Dashboard() {
       }
     });
   }, []);
+
+  // Live data for stat tiles, weekly chart, monthly reports, and the
+  // activity feed — replaces the old hardcoded mock/dashboard.ts numbers.
+  useEffect(() => {
+    if (!partnerDbId) return;
+    (async () => {
+      const [{ data: msgs }, { data: configs }] = await Promise.all([
+        supabase
+          .from("messages")
+          .select("channel, direction, sender_id, sender_name, status, created_at")
+          .eq("partner_id", partnerDbId),
+        partnerIdState
+          ? supabase.from("channel_configs").select("channel_id, created_at").eq("partner_id", partnerIdState)
+          : Promise.resolve({ data: [] as ChannelConfigRow[] }),
+      ]);
+      setLiveMessages((msgs as MessageRow[]) ?? []);
+      setChannelConfigRows((configs as ChannelConfigRow[]) ?? []);
+    })();
+  }, [partnerDbId, partnerIdState]);
 
   const showToast = (msg: string) => { setToastMessage(msg); setTimeout(() => setToastMessage(null), 2500); };
 
@@ -450,10 +471,9 @@ ${monthName} ${year}
 SUMMARY
 -----------------------------------------
 Total Messages:    ${data.totalMessages.toLocaleString()}
-Resolved:          ${data.resolved.toLocaleString()}
-Resolution Rate:   ${((data.resolved / data.totalMessages) * 100).toFixed(2)}%
+Delivered:         ${data.delivered.toLocaleString()}
+Delivered Rate:    ${data.totalMessages > 0 ? ((data.delivered / data.totalMessages) * 100).toFixed(2) : "0.00"}%
 Avg Response Time: ${data.avgResponseMin} minutes
-CSAT Score:        ${data.csat}%
 Peak Hours:        ${data.peakHours}
 Top Customer:      ${data.topCustomer}
 
@@ -484,10 +504,9 @@ ${date.toISOString().split("T")[0]}
       "Metric,Value",
       `Channel,${channel.name}`,
       `Total Messages,${data.totalMessages}`,
-      `Resolved,${data.resolved}`,
-      `Resolution Rate,${((data.resolved / data.totalMessages) * 100).toFixed(2)}%`,
+      `Delivered,${data.delivered}`,
+      `Delivered Rate,${data.totalMessages > 0 ? ((data.delivered / data.totalMessages) * 100).toFixed(2) : "0.00"}%`,
       `Avg Response Time (min),${data.avgResponseMin}`,
-      `CSAT Score,${data.csat}%`,
       `Peak Hours,${data.peakHours}`,
       `Top Customer,${data.topCustomer}`,
     ];
@@ -535,6 +554,13 @@ ${date.toISOString().split("T")[0]}
 
   const connectedArray = partnerChannels.filter((ch) => configuredChannels.has(ch.id));
   const disconnectedArray = partnerChannels.filter((ch) => !configuredChannels.has(ch.id));
+
+  const connectedChannelIds = connectedArray.map((ch) => ch.id);
+  const { stats: dashboardStats, channelMetrics, analyticsTrends, monthlyReportData, recentActivity } = useMemo(
+    () => computeDashboardAnalytics(liveMessages, channelConfigRows, connectedChannelIds),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [liveMessages, channelConfigRows, configuredChannels]
+  );
 
   return (
     <>
@@ -871,18 +897,14 @@ ${date.toISOString().split("T")[0]}
                                   </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-2 mb-3">
+                                <div className="grid grid-cols-3 gap-2 mb-3">
                                   <div className="bg-background-100 rounded p-2">
-                                    <p className="text-[10px] text-foreground-400">Resolution</p>
-                                    <p className="text-xs font-bold text-foreground-800">{((data.resolved / data.totalMessages) * 100).toFixed(1)}%</p>
+                                    <p className="text-[10px] text-foreground-400">Delivered</p>
+                                    <p className="text-xs font-bold text-foreground-800">{data.totalMessages > 0 ? ((data.delivered / data.totalMessages) * 100).toFixed(1) : "0.0"}%</p>
                                   </div>
                                   <div className="bg-background-100 rounded p-2">
                                     <p className="text-[10px] text-foreground-400">Avg Reply</p>
                                     <p className="text-xs font-bold text-foreground-800">{data.avgResponseMin} min</p>
-                                  </div>
-                                  <div className="bg-background-100 rounded p-2">
-                                    <p className="text-[10px] text-foreground-400">CSAT</p>
-                                    <p className="text-xs font-bold text-foreground-800">{data.csat}%</p>
                                   </div>
                                   <div className="bg-background-100 rounded p-2">
                                     <p className="text-[10px] text-foreground-400">Peak</p>

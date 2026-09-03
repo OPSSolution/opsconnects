@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requirePartnerOwner } from "../_shared/auth.ts";
 
 const SUPABASE_URL              = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -82,6 +83,11 @@ Deno.serve(async (req: Request) => {
   }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+  const caller = await requirePartnerOwner(supabase, req, partnerId, "id");
+  if (!caller) {
+    return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: cors });
+  }
 
   // Build 40 realistic messages spread across the last 30 days
   const rows = [];

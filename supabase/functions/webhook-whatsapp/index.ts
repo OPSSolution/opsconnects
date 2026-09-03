@@ -84,6 +84,11 @@ Deno.serve(async (req: Request) => {
             ? await resolvePartnerId("whatsapp", phoneNumberId)
             : undefined;
 
+          if (!partnerId) {
+            console.error("WhatsApp status update skipped — no channel_configs mapping for phone_number_id:", phoneNumberId);
+            continue;
+          }
+
           const newStatus =
             statusUpdate.status === "delivered" ? "delivered"
             : statusUpdate.status === "read"      ? "read"
@@ -96,12 +101,13 @@ Deno.serve(async (req: Request) => {
             Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
             { auth: { persistSession: false } }
           );
-          await supabase
+          const { error: statusError } = await supabase
             .from("messages")
             .update({ status: newStatus })
             .eq("external_message_id", statusUpdate.id)
             .eq("channel", "whatsapp")
-            .eq("partner_id", partnerId ?? "");
+            .eq("partner_id", partnerId);
+          if (statusError) console.error("WhatsApp status update failed:", statusError.message);
         }
       }
     }

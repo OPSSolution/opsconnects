@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requirePartnerOwner } from "../_shared/auth.ts";
 
 const SUPABASE_URL              = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -29,12 +30,21 @@ Deno.serve(async (req: Request) => {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  // Fetch user_id before deleting the row
+  // Fetch user_id + owning partner before deleting the row
   const { data: agent } = await supabase
     .from("partner_agents")
-    .select("user_id")
+    .select("user_id, partner_id")
     .eq("id", agentId)
     .maybeSingle();
+
+  if (!agent) {
+    return new Response(JSON.stringify({ error: "Agent not found" }), { status: 404, headers: CORS });
+  }
+
+  const caller = await requirePartnerOwner(supabase, req, agent.partner_id as string);
+  if (!caller) {
+    return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: CORS });
+  }
 
   // Delete the row
   const { error } = await supabase.from("partner_agents").delete().eq("id", agentId);

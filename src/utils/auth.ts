@@ -19,9 +19,6 @@ export interface PartnerRecord {
   channels: string[];
 }
 
-export const ADMIN_EMAIL = "admin@opsconnect.io";
-export const ADMIN_PASSWORD = "admin123";
-
 // ── Local storage helpers ─────────────────────────────────────────────────────
 
 function getLocalSession(): Session | null {
@@ -46,13 +43,17 @@ function setLocalSession(session: Session | null) {
 // ── Session ───────────────────────────────────────────────────────────────────
 
 export async function getSession(): Promise<Session | null> {
-  // Admin: kept in localStorage (no Supabase user needed)
-  const local = getLocalSession();
-  if (local?.role === "admin") return local;
-
-  // Partner/Agent: check Supabase Auth session
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.user) return null;
+
+  // Admin: verified server-side via the app_metadata claim on the JWT
+  // (only settable via the Supabase dashboard / service role, never by the
+  // user), not by anything the client can forge.
+  if (session.user.app_metadata?.role === "admin") {
+    const s: Session = { role: "admin", partnerId: "ADMIN", partnerName: "Admin", email: session.user.email ?? "" };
+    setLocalSession(s);
+    return s;
+  }
 
   // Check if partner first
   const { data: partner } = await supabase
@@ -110,14 +111,9 @@ export async function signIn(
 ): Promise<{ session: Session | null; error: string | null }> {
   const trimEmail = email.trim().toLowerCase();
 
-  // Admin: hardcoded, stored locally
-  if (trimEmail === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-    const s: Session = { role: "admin", partnerId: "ADMIN", partnerName: "Admin", email: ADMIN_EMAIL };
-    setLocalSession(s);
-    return { session: s, error: null };
-  }
-
-  // Partner: Supabase Auth
+  // Admin, partner, and agent all authenticate through Supabase Auth;
+  // getSession() resolves the role afterwards (admin via JWT claim, partner
+  // via the partners table, agent/viewer via partner_agents).
   const { error } = await supabase.auth.signInWithPassword({ email: trimEmail, password });
   if (error) return { session: null, error: "Invalid email or password." };
 

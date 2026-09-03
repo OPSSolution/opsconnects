@@ -361,18 +361,11 @@ export default function ChatReport({ partnerId, partnerTextId }: Props) {
     setSeeding(true);
     setSeedMsg(null);
     try {
-      const supabaseUrl = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
-      const res = await fetch(`${supabaseUrl}/functions/v1/seed-demo-messages`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string}`,
-        },
-        body: JSON.stringify({ partner_id: partnerId }),
+      const { data, error } = await supabase.functions.invoke("seed-demo-messages", {
+        body: { partner_id: partnerId },
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Seed failed");
-      setSeedMsg(`${json.inserted} demo messages loaded!`);
+      if (error || data?.error) throw new Error(data?.error ?? error?.message ?? "Seed failed");
+      setSeedMsg(`${data.inserted} demo messages loaded!`);
       // refresh all data
       fetchSummaries();
       if (view === "messages") fetchMsgs();

@@ -1,11 +1,138 @@
--- Run this in Supabase Dashboard → SQL Editor
--- Safe to run on your existing schema.
+-- Run this in Supabase Dashboard → SQL Editor.
+-- Idempotent — safe to run repeatedly against an existing project.
+--
+-- This is the complete schema: partners, channel_configs, partner_agents,
+-- messages, support_requests, live_chats, live_chat_messages, plus RLS
+-- policies scoped to each partner's own data (and an admin override via
+-- the JWT app_metadata.role claim — see the bottom of this file).
 
--- 1. Add auth link + email to partners (safe if already exists)
+-- ─────────────────────────────────────────────
+-- PARTNERS
+-- ─────────────────────────────────────────────
+create table if not exists public.partners (
+  id                   uuid        default gen_random_uuid() primary key,
+  partner_id           text        unique not null,
+  partner_name         text        not null,
+  email                text,
+  user_id              uuid        references auth.users(id) on delete cascade,
+  ai_business_context  text,       -- free-text fed to the AI chat widget
+  widget_settings      jsonb,      -- branding (name/avatar/logo/colors/contacts) for the embed widget
+  telegram_bot_token   text,       -- Telegram bot used for live-chat-request alerts
+  telegram_chat_id     text,       -- chat/group to notify
+  created_at           timestamptz not null default now()
+);
+
+-- Safe to run against an existing partners table that predates these columns
 alter table public.partners
-  add column if not exists user_id             uuid references auth.users(id) on delete cascade,
-  add column if not exists email               text,
-  add column if not exists ai_business_context text;  -- free-text fed to the AI chat widget
+  add column if not exists widget_settings    jsonb,
+  add column if not exists telegram_bot_token text,
+  add column if not exists telegram_chat_id   text;
+
+alter table public.partners enable row level security;
+
+drop policy if exists "Public read partners"       on public.partners;
+drop policy if exists "Users insert own partner"   on public.partners;
+drop policy if exists "Partners can read own record"  on public.partners;
+drop policy if exists "Partners can update own record" on public.partners;
+drop policy if exists "Allow insert on signup"        on public.partners;
+drop policy if exists "Admins can read all partners"  on public.partners;
+
+create policy "Partners can read own record"
+  on public.partners for select
+  using (auth.uid() = user_id);
+
+create policy "Partners can update own record"
+  on public.partners for update
+  using (auth.uid() = user_id);
+
+create policy "Allow insert on signup"
+  on public.partners for insert
+  with check (auth.uid() = user_id);
+
+-- Admin dashboard: only true when the caller's JWT carries
+-- app_metadata.role = "admin" (settable only via the Supabase dashboard
+-- or service-role API — never by the user themselves).
+create policy "Admins can read all partners"
+  on public.partners for select
+  using ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin');
+
+-- ─────────────────────────────────────────────
+-- CHANNEL CONFIGS
+-- ─────────────────────────────────────────────
+create table if not exists public.channel_configs (
+  id          uuid        default gen_random_uuid() primary key,
+  partner_id  text        not null references public.partners(partner_id) on delete cascade,
+  channel_id  text        not null,
+  channel     text,
+  account_id  text,
+  configured  boolean     default true,
+  created_at  timestamptz not null default now(),
+  unique(partner_id, channel_id)
+);
+
+alter table public.channel_configs enable row level security;
+
+drop policy if exists "Public read channel_configs"     on public.channel_configs;
+drop policy if exists "Users manage channel_configs"     on public.channel_configs;
+drop policy if exists "Partners access own channel_configs" on public.channel_configs;
+drop policy if exists "Admins can read all channel_configs"  on public.channel_configs;
+
+create policy "Partners access own channel_configs"
+  on public.channel_configs for all
+  using (
+    partner_id in (
+      select partner_id from public.partners where user_id = auth.uid()
+    )
+  );
+
+create policy "Admins can read all channel_configs"
+  on public.channel_configs for select
+  using ((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin');
+
+-- ─────────────────────────────────────────────
+-- NEWSLETTER SUBSCRIBERS
+-- Populated by the newsletter-subscribe Edge Function (service_role key).
+-- No client-facing RLS policies — locked to service-role access only.
+-- ─────────────────────────────────────────────
+create table if not exists public.newsletter_subscribers (
+  id         uuid        default gen_random_uuid() primary key,
+  email      text        unique not null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.newsletter_subscribers enable row level security;
+
+-- ─────────────────────────────────────────────
+-- PARTNER AGENTS (team members: agent / viewer roles)
+-- Created via the create-agent Edge Function (service_role key).
+-- ─────────────────────────────────────────────
+create table if not exists public.partner_agents (
+  id           uuid        default gen_random_uuid() primary key,
+  partner_id   text        not null,
+  user_id      uuid        references auth.users(id) on delete set null,
+  name         text        not null,
+  email        text        not null,
+  role         text        not null default 'agent',
+  avatar_color text,
+  created_at   timestamptz not null default now()
+);
+
+alter table public.partner_agents enable row level security;
+
+drop policy if exists "Partners manage own agents" on public.partner_agents;
+drop policy if exists "Agents read own record"     on public.partner_agents;
+
+create policy "Partners manage own agents"
+  on public.partner_agents for all
+  using (
+    partner_id in (
+      select partner_id from public.partners where user_id = auth.uid()
+    )
+  );
+
+create policy "Agents read own record"
+  on public.partner_agents for select
+  using (auth.uid() = user_id);
 
 -- ─────────────────────────────────────────────
 -- MESSAGES TABLE
@@ -69,36 +196,6 @@ create policy "Partners read own messages"
 
 -- Edge Functions use service_role key → bypasses RLS (no insert policy needed)
 
--- 2. Enable RLS on all tables
-alter table public.partners       enable row level security;
-alter table public.channel_configs enable row level security;
-alter table public.team_members   enable row level security;
-alter table public.conversations  enable row level security;
-
--- 3. Partners policies
-drop policy if exists "Public read partners"      on public.partners;
-drop policy if exists "Users insert own partner"  on public.partners;
-drop policy if exists "Users update own partner"  on public.partners;
-
-create policy "Public read partners"
-  on public.partners for select using (true);
-
-create policy "Users insert own partner"
-  on public.partners for insert with check (true);
-
-create policy "Users update own partner"
-  on public.partners for update using (auth.uid() = user_id);
-
--- 4. Channel configs policies
-drop policy if exists "Public read channel_configs"  on public.channel_configs;
-drop policy if exists "Users manage channel_configs" on public.channel_configs;
-
-create policy "Public read channel_configs"
-  on public.channel_configs for select using (true);
-
-create policy "Users manage channel_configs"
-  on public.channel_configs for all using (true);
-
 -- ─────────────────────────────────────────────
 -- SUPPORT REQUESTS TABLE
 -- Stores visitor info collected by the embedded chat widget.
@@ -124,6 +221,7 @@ alter table public.support_requests enable row level security;
 
 drop policy if exists "Partners read own support requests"   on public.support_requests;
 drop policy if exists "Partners update own support requests" on public.support_requests;
+drop policy if exists "Allow anonymous insert" on public.support_requests;
 
 -- Authenticated partners can read and update their own support requests
 create policy "Partners read own support requests"
@@ -142,7 +240,10 @@ create policy "Partners update own support requests"
     )
   );
 
--- Edge Functions insert via service_role key → bypasses RLS
+-- The public chat widget submits support requests anonymously
+create policy "Allow anonymous insert"
+  on public.support_requests for insert
+  with check (true);
 
 -- ─────────────────────────────────────────────
 -- LIVE CHAT TABLES
@@ -182,6 +283,9 @@ alter table public.live_chat_messages enable row level security;
 
 drop policy if exists "Partners read own live chats"    on public.live_chats;
 drop policy if exists "Partners update own live chats"  on public.live_chats;
+drop policy if exists "Allow anonymous insert live_chats" on public.live_chats;
+drop policy if exists "Agents read assigned live_chats"   on public.live_chats;
+drop policy if exists "Agents update assigned live_chats" on public.live_chats;
 
 create policy "Partners read own live chats"
   on public.live_chats for select
@@ -191,29 +295,51 @@ create policy "Partners update own live chats"
   on public.live_chats for update
   using (partner_id in (select partner_id from public.partners where user_id = auth.uid()));
 
+-- The public chat widget creates live chat sessions anonymously
+create policy "Allow anonymous insert live_chats"
+  on public.live_chats for insert
+  with check (true);
+
+create policy "Agents read assigned live_chats"
+  on public.live_chats for select
+  using (partner_id in (select partner_id from public.partner_agents where user_id = auth.uid()));
+
+create policy "Agents update assigned live_chats"
+  on public.live_chats for update
+  using (partner_id in (select partner_id from public.partner_agents where user_id = auth.uid()));
+
 drop policy if exists "Partners read live chat messages"   on public.live_chat_messages;
 drop policy if exists "Partners insert live chat messages" on public.live_chat_messages;
+drop policy if exists "Allow all on live_chat_messages"    on public.live_chat_messages;
+drop policy if exists "Allow read on live_chat_messages"   on public.live_chat_messages;
 
-create policy "Partners read live chat messages"
+-- Widget visitors (anonymous) and partner staff both read/write these —
+-- access is effectively gated by knowing the chat_id (a uuid handed back
+-- by the widget-init/live-chat functions), not by RLS row ownership.
+create policy "Allow all on live_chat_messages"
+  on public.live_chat_messages for all
+  with check (true);
+
+create policy "Allow read on live_chat_messages"
   on public.live_chat_messages for select
-  using (
-    chat_id in (
-      select lc.id from public.live_chats lc
-      join public.partners p on p.partner_id = lc.partner_id
-      where p.user_id = auth.uid()
-    )
-  );
+  using (true);
 
-create policy "Partners insert live chat messages"
-  on public.live_chat_messages for insert
-  with check (
-    chat_id in (
-      select lc.id from public.live_chats lc
-      join public.partners p on p.partner_id = lc.partner_id
-      where p.user_id = auth.uid()
-    )
-  );
+-- Enable Realtime for live chat tables (guarded — "add table" errors if the
+-- table is already a publication member, e.g. from a previous run of this
+-- script or of the migration)
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'live_chats'
+  ) then
+    alter publication supabase_realtime add table public.live_chats;
+  end if;
 
--- Enable Realtime for live chat tables
-alter publication supabase_realtime add table public.live_chats;
-alter publication supabase_realtime add table public.live_chat_messages;
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'live_chat_messages'
+  ) then
+    alter publication supabase_realtime add table public.live_chat_messages;
+  end if;
+end $$;
