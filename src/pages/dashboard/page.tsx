@@ -9,6 +9,7 @@ import { supabase } from "@/utils/supabase/client";
 import ChatReport from "./components/ChatReport";
 import SupportRequests from "./components/SupportRequests";
 import LiveChat from "./components/LiveChat";
+import opsConnectWidgetSource from "../../../sdk/react-native/src/OPSConnectWidget.tsx?raw";
 
 type TestState = "idle" | "testing" | "success" | "error" | "unverified";
 type BulkTestEntry = { channelId: string; status: TestState };
@@ -433,6 +434,18 @@ export default function Dashboard() {
     }
     setWidgetRnCopied(true);
     setTimeout(() => setWidgetRnCopied(false), 2000);
+  };
+
+  const handleDownloadReactNativeWidget = () => {
+    const blob = new Blob([opsConnectWidgetSource], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "OPSConnectWidget.tsx";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   // Sends a real Telegram message via the partner's saved bot token and
@@ -1410,10 +1423,16 @@ ${date.toISOString().split("T")[0]}
                         <div>
                           <p className="text-xs font-semibold uppercase tracking-widest text-foreground-400 mb-3">4 — React Native SDK</p>
                           <p className="text-xs text-foreground-500 mb-3">
-                            Install <code className="bg-background-200 px-1 rounded text-[11px]">react-native-webview</code>, copy{" "}
-                            <code className="bg-background-200 px-1 rounded text-[11px]">sdk/react-native/src/OPSConnectWidget.tsx</code>{" "}
-                            from this repo into your project, then use the snippet below.
+                            Install <code className="bg-background-200 px-1 rounded text-[11px]">react-native-webview</code>, download{" "}
+                            <code className="bg-background-200 px-1 rounded text-[11px]">OPSConnectWidget.tsx</code>{" "}
+                            below into your project, then use the snippet below it.
                           </p>
+                          <button
+                            onClick={handleDownloadReactNativeWidget}
+                            className="mb-3 text-xs font-semibold px-3 py-2 rounded-lg border border-primary-400 text-primary-600 hover:bg-primary-50 transition-colors cursor-pointer whitespace-nowrap flex items-center gap-1.5"
+                          >
+                            <i className="ri-download-2-line"></i> Download OPSConnectWidget.tsx
+                          </button>
                           <div className="relative">
                             <pre className="bg-foreground-950 text-accent-300 text-[11px] font-mono rounded-xl p-4 overflow-x-auto leading-relaxed whitespace-pre max-h-72">{generateReactNativeSnippet()}</pre>
                             <button
