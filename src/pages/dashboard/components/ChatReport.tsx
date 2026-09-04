@@ -355,27 +355,6 @@ export default function ChatReport({ partnerId, partnerTextId }: Props) {
   const toggleCh = (id: string) => { setChFilter((p) => p.includes(id) ? p.filter((c) => c !== id) : [...p, id]); setPage(0); };
   const doSearch = () => { setSearchVal(searchInput); setPage(0); };
 
-  const seedDemoData = async () => {
-    if (!partnerId) return;
-    setSeeding(true);
-    setSeedMsg(null);
-    try {
-      const { data, error } = await supabase.functions.invoke("seed-demo-messages", {
-        body: { partner_id: partnerId },
-      });
-      if (error || data?.error) throw new Error(data?.error ?? error?.message ?? "Seed failed");
-      setSeedMsg(`${data.inserted} demo messages loaded!`);
-      // refresh all data
-      fetchSummaries();
-      if (view === "messages") fetchMsgs();
-      if (view === "clients") fetchClients();
-      if (view === "timeline") fetchTimeline();
-    } catch (err) {
-      setSeedMsg(`Error: ${(err as Error).message}`);
-    }
-    setSeeding(false);
-  };
-
   const copyWebhookUrl = (url: string) => {
     navigator.clipboard.writeText(url).catch(() => {});
     setCopiedUrl(url);

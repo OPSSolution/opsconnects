@@ -35,3 +35,24 @@ export async function requirePartnerOwner(
   if (!partner) return null;
   return { userId: user.id };
 }
+
+/**
+ * Verifies the caller's Supabase session and confirms the "admin" role claim
+ * on their JWT (set server-side via app_metadata — see src/utils/auth.ts
+ * getSession()). Use this in place of a shared admin_key secret for any
+ * edge function serving the admin portal.
+ */
+export async function requireAdmin(
+  supabase: SupabaseClient,
+  req: Request,
+): Promise<{ userId: string } | null> {
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+  if (!token) return null;
+
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+  if (error || !user) return null;
+  if (user.app_metadata?.role !== "admin") return null;
+
+  return { userId: user.id };
+}

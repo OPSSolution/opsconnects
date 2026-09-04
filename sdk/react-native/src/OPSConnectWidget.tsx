@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { StyleSheet, View, ActivityIndicator } from 'react-native';
+import { Linking, StyleSheet, View, ActivityIndicator } from 'react-native';
 import { WebView } from 'react-native-webview';
 import type { WebViewMessageEvent } from 'react-native-webview';
 
@@ -70,24 +70,41 @@ export function OPSConnectWidget({
     } catch {}
   };
 
-  return (
-    <View style={styles.container}>
-      <WebView
-        ref={webViewRef}
-        source={{ uri }}
-        style={styles.webview}
-        startInLoadingState
-        javaScriptEnabled
-        domStorageEnabled
-        originWhitelist={['*']}
-        onMessage={onMessage}
-        renderLoading={() => (
-          <View style={styles.loader}>
-            <ActivityIndicator size="large" color={colorFrom} />
-          </View>
-        )}
-      />
-    </View>
+  // Keep the widget's own pages inside this WebView, but hand every other
+  // link (Telegram, WhatsApp, mailto:, etc.) to the OS instead of letting
+  // react-native-webview open it in a second in-app WebView — that second
+  // WebView is what surfaces as "unsupported URL" (NSURLErrorDomain -1002)
+  // when a partner's configured link is malformed.
+  const onShouldStartLoadWithRequest = (request: { url: string }) => {
+    if (request.url.startsWith(baseUrl)) return true;
+    Linking.openURL(request.url).catch(() => {});
+    return false;
+  };
+
+  return React.createElement(
+    View,
+    { style: styles.container },
+    React.createElement(WebView, {
+      ref: webViewRef,
+      source: { uri },
+      style: styles.webview,
+      startInLoadingState: true,
+      javaScriptEnabled: true,
+      domStorageEnabled: true,
+      originWhitelist: ['*'],
+      onMessage,
+      onShouldStartLoadWithRequest,
+      setSupportMultipleWindows: false,
+      renderLoading: () =>
+        React.createElement(
+          View,
+          { style: styles.loader },
+          React.createElement(ActivityIndicator, {
+            size: 'large',
+            color: colorFrom,
+          }),
+        ),
+    }),
   );
 }
 

@@ -1,5 +1,4 @@
 import { supabase } from "./supabase/client";
-import { ADMIN_PASSWORD } from "./auth";
 
 export interface Overview {
   partners: number;
@@ -60,7 +59,7 @@ export interface AgentRow {
 
 async function call<T>(resource: string, extra: Record<string, unknown> = {}): Promise<T> {
   const { data, error } = await supabase.functions.invoke("admin-data", {
-    body: { admin_key: ADMIN_PASSWORD, resource, ...extra },
+    body: { resource, ...extra },
   });
   if (error || !data || data.error) {
     throw new Error(data?.error ?? error?.message ?? "Admin request failed");

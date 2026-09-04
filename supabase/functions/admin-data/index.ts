@@ -3,18 +3,18 @@
  * which is served by admin-partners).
  *
  * Uses the service role key to read/write across ALL partners, bypassing the
- * per-partner RLS policies (which key off auth.uid() — something the app's
- * client-side-only "admin" role doesn't have). Gated by the same ADMIN_PANEL_KEY
- * shared secret as admin-partners.
+ * per-partner RLS policies (which key off auth.uid()). Gated by the caller's
+ * real Supabase Auth session carrying the "admin" JWT claim (see
+ * supabase/functions/_shared/auth.ts requireAdmin) — not a shared secret.
  *
- * POST body: { admin_key, resource, action?, ...params }
+ * POST body: { resource, action?, ...params }
  *   resource: "overview" | "support_requests" | "live_chats" | "live_chat_messages" | "agents"
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireAdmin } from "../_shared/auth.ts";
 
 const SUPABASE_URL              = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const ADMIN_PANEL_KEY           = Deno.env.get("ADMIN_PANEL_KEY") ?? "";
 
 const CORS = {
   "Access-Control-Allow-Origin":  "*",
@@ -37,15 +37,14 @@ Deno.serve(async (req: Request) => {
   try { body = await req.json() as Record<string, unknown>; }
   catch { return err("Invalid JSON"); }
 
-  const adminKey = body.admin_key as string | undefined;
-  if (!ADMIN_PANEL_KEY || adminKey !== ADMIN_PANEL_KEY) return err("Forbidden", 403);
-
   const resource = body.resource as string | undefined;
   const action   = body.action   as string | undefined;
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
+
+  if (!(await requireAdmin(supabase, req))) return err("Forbidden", 403);
 
   // ── Overview stats ─────────────────────────────────────────────────────
   if (resource === "overview") {

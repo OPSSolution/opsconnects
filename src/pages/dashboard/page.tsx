@@ -33,6 +33,13 @@ const channelColors: Record<string, string> = {
   livechat: "#1E7FC2", wechat: "#07C160",
 };
 
+function timeAgo(iso: string) {
+  const secs = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (secs < 60) return `${secs}s ago`;
+  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
+  return `${Math.floor(secs / 3600)}h ago`;
+}
+
 // Groups the dashboard's many sections into focused tabs instead of one
 // long scroll: at-a-glance stats/monitoring, connecting/reporting on
 // channels, the actual message inbox, and one-time setup/configuration.
@@ -80,6 +87,8 @@ export default function Dashboard() {
   const [tgSaved, setTgSaved] = useState(false);
   const [liveMessages, setLiveMessages] = useState<MessageRow[]>([]);
   const [channelConfigRows, setChannelConfigRows] = useState<ChannelConfigRow[]>([]);
+  const [testStates, setTestStates] = useState<Record<string, TestState>>({});
+  const [bulkTest, setBulkTest] = useState<{ running: boolean; entries: BulkTestEntry[] }>({ running: false, entries: [] });
 
   useEffect(() => {
     getSession().then(async (session) => {
@@ -549,11 +558,9 @@ ${monthName} ${year}
 SUMMARY
 -----------------------------------------
 Total Messages:    ${data.totalMessages.toLocaleString()}
-Delivered:         ${data.delivered.toLocaleString()}
-Delivered Rate:    ${data.totalMessages > 0 ? ((data.delivered / data.totalMessages) * 100).toFixed(2) : "0.00"}%
-Avg Response Time: ${data.avgResponseMin} minutes
-Peak Hours:        ${data.peakHours}
-Top Customer:      ${data.topCustomer}
+vs Last Month:     ${data.vsLastMonthPct === null ? "N/A" : `${data.vsLastMonthPct >= 0 ? "+" : ""}${data.vsLastMonthPct.toFixed(1)}%`}
+Peak Hour:         ${data.peakHour}
+Top Contact:       ${data.topContact}
 
 CHANNEL DETAILS
 -----------------------------------------
@@ -582,11 +589,9 @@ ${date.toISOString().split("T")[0]}
       "Metric,Value",
       `Channel,${channel.name}`,
       `Total Messages,${data.totalMessages}`,
-      `Delivered,${data.delivered}`,
-      `Delivered Rate,${data.totalMessages > 0 ? ((data.delivered / data.totalMessages) * 100).toFixed(2) : "0.00"}%`,
-      `Avg Response Time (min),${data.avgResponseMin}`,
-      `Peak Hours,${data.peakHours}`,
-      `Top Customer,${data.topCustomer}`,
+      `vs Last Month,${data.vsLastMonthPct === null ? "N/A" : `${data.vsLastMonthPct.toFixed(1)}%`}`,
+      `Peak Hour,${data.peakHour}`,
+      `Top Contact,${data.topContact}`,
     ];
     const csvContent = csvRows.join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -804,6 +809,7 @@ ${date.toISOString().split("T")[0]}
                     <div className="space-y-3">
                       {connectedArray.map((channel) => {
                         const chMetrics = metrics?.channelMetrics[channel.id];
+                        const testState = testStates[channel.id];
                         return (
                           <div key={channel.id} className="bg-background-100 rounded-xl border border-accent-200/60 p-5">
                             <div className="flex items-start justify-between">
@@ -1023,16 +1029,16 @@ ${date.toISOString().split("T")[0]}
 
                                 <div className="grid grid-cols-3 gap-2 mb-3">
                                   <div className="bg-background-100 rounded p-2">
-                                    <p className="text-[10px] text-foreground-400">Delivered</p>
-                                    <p className="text-xs font-bold text-foreground-800">{data.totalMessages > 0 ? ((data.delivered / data.totalMessages) * 100).toFixed(1) : "0.0"}%</p>
+                                    <p className="text-[10px] text-foreground-400">vs Last Month</p>
+                                    <p className="text-xs font-bold text-foreground-800">{data.vsLastMonthPct === null ? "N/A" : `${data.vsLastMonthPct >= 0 ? "+" : ""}${data.vsLastMonthPct.toFixed(1)}%`}</p>
                                   </div>
                                   <div className="bg-background-100 rounded p-2">
                                     <p className="text-[10px] text-foreground-400">Peak Hour</p>
                                     <p className="text-xs font-bold text-foreground-800 truncate">{data.peakHour}</p>
                                   </div>
                                   <div className="bg-background-100 rounded p-2">
-                                    <p className="text-[10px] text-foreground-400">Peak</p>
-                                    <p className="text-xs font-bold text-foreground-800 truncate">{data.peakHours.split(" ")[0]}</p>
+                                    <p className="text-[10px] text-foreground-400">Top Contact</p>
+                                    <p className="text-xs font-bold text-foreground-800 truncate">{data.topContact}</p>
                                   </div>
                                 </div>
 
