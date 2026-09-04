@@ -220,18 +220,22 @@ export async function clearSession(): Promise<void> {
 // ── Partner data ──────────────────────────────────────────────────────────────
 
 export async function getAllPartners(): Promise<PartnerRecord[]> {
-  const { data, error } = await supabase.functions.invoke("admin-partners", {
-    body: { admin_key: ADMIN_PASSWORD },
-  });
+  const { data, error } = await supabase
+    .from("partners")
+    .select(`
+      partner_id,
+      partner_name,
+      email,
+      created_at,
+      channel_configs ( channel_id, configured )
+    `)
+    .order("created_at", { ascending: false });
 
-  if (error || !data || data.error) {
-    console.error("getAllPartners failed:", error?.message ?? data?.error);
-    return [];
-  }
+  if (error || !data) return [];
 
-  return (data.partners as Array<Record<string, unknown>>).map((p) => ({
-    id:        p.partner_id as string,
-    name:      p.partner_name as string,
+  return data.map((p) => ({
+    id:        p.partner_id,
+    name:      p.partner_name,
     email:     (p.email as string) ?? "",
     password:  "",
     createdAt: p.created_at as string,
