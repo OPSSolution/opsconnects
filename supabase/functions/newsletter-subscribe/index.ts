@@ -1,4 +1,8 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
+const SUPABASE_URL              = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const NOTIFY_EMAIL  = "dev@ballangkmall.com";
 const FROM_EMAIL    = "OPSConnect <noreply@opsconnect.io>";
 
@@ -35,8 +39,18 @@ Deno.serve(async (req: Request) => {
     return new Response(JSON.stringify({ error: "Valid email required" }), { status: 400, headers: CORS });
   }
 
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+  const { error: insertError } = await supabase
+    .from("newsletter_subscribers")
+    .upsert({ email }, { onConflict: "email", ignoreDuplicates: true });
+
+  if (insertError) {
+    console.error("Newsletter subscribe insert failed:", insertError.message);
+    return new Response(JSON.stringify({ error: "Failed to save subscription" }), { status: 500, headers: CORS });
+  }
+
   // 1. Confirmation email to the subscriber
-  await sendEmail(
+  const confirmSent = await sendEmail(
     email,
     "You're subscribed to OPSConnect! 🎉",
     `
@@ -61,9 +75,10 @@ Deno.serve(async (req: Request) => {
     </div>
     `
   );
+  if (!confirmSent) console.error("Newsletter confirmation email failed to send to:", email);
 
   // 2. Notification to admin
-  await sendEmail(
+  const notifySent = await sendEmail(
     NOTIFY_EMAIL,
     "New OPSConnect Newsletter Subscriber",
     `
@@ -74,6 +89,9 @@ Deno.serve(async (req: Request) => {
     </div>
     `
   );
+  if (!notifySent) console.error("Newsletter admin notification email failed to send for:", email);
 
-  return new Response(JSON.stringify({ ok: true }), { headers: CORS });
+  // The subscription itself is saved regardless of email delivery — that's
+  // the part that actually matters; email failures are logged, not fatal.
+  return new Response(JSON.stringify({ ok: true, emailSent: confirmSent }), { headers: CORS });
 });

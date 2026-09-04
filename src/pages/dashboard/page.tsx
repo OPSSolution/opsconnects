@@ -1,14 +1,26 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
 import Navbar from "@/components/feature/Navbar";
 import Footer from "@/components/feature/Footer";
 import { partnerChannels } from "@/mocks/partners";
+import { computeDashboardAnalytics, type MessageRow, type ChannelConfigRow } from "./analytics";
 import { getSession, getPartnerChannels } from "@/utils/auth";
 import { supabase } from "@/utils/supabase/client";
 import { getDashboardMetrics, DashboardMetrics } from "@/utils/dashboardData";
 import ChatReport from "./components/ChatReport";
 import SupportRequests from "./components/SupportRequests";
 import LiveChat from "./components/LiveChat";
+import opsConnectWidgetSource from "../../../sdk/react-native/src/OPSConnectWidget.tsx?raw";
+
+type TestState = "idle" | "testing" | "success" | "error" | "unverified";
+type BulkTestEntry = { channelId: string; status: TestState };
+
+// Only Telegram has a stored per-partner credential (telegram_bot_token /
+// telegram_chat_id) that lets us actually send a test message and confirm
+// delivery. Other channels are provisioned at the platform/webhook level —
+// there's no per-partner API key to test against yet, so we're honest about
+// that instead of faking a pass/fail.
+const REAL_TEST_CHANNELS = new Set(["telegram"]);
 
 const channelIcons: Record<string, string> = {
   whatsapp: "ri-whatsapp-line", telegram: "ri-telegram-line", messenger: "ri-messenger-line",
@@ -21,13 +33,15 @@ const channelColors: Record<string, string> = {
   livechat: "#1E7FC2", wechat: "#07C160",
 };
 
-function timeAgo(iso: string) {
-  const secs = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (secs < 60) return `${secs}s ago`;
-  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
-  if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`;
-  return `${Math.floor(secs / 86400)}d ago`;
-}
+// Groups the dashboard's many sections into focused tabs instead of one
+// long scroll: at-a-glance stats/monitoring, connecting/reporting on
+// channels, the actual message inbox, and one-time setup/configuration.
+const DASHBOARD_TABS: { id: "overview" | "channels" | "inbox" | "setup"; label: string; icon: string }[] = [
+  { id: "overview", label: "Overview", icon: "ri-dashboard-line" },
+  { id: "channels", label: "Channels", icon: "ri-plug-line" },
+  { id: "inbox", label: "Inbox", icon: "ri-inbox-line" },
+  { id: "setup", label: "Setup", icon: "ri-settings-3-line" },
+];
 
 export default function Dashboard() {
   const [configuredChannels, setConfiguredChannels] = useState<Set<string>>(new Set());
@@ -37,6 +51,7 @@ export default function Dashboard() {
   const [disconnectModal, setDisconnectModal] = useState<string | null>(null);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [activeAnalyticsChannel, setActiveAnalyticsChannel] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"overview" | "channels" | "inbox" | "setup">("overview");
   const [partnerName, setPartnerName] = useState<string | null>(null);
   const [partnerIdState, setPartnerIdState] = useState<string | null>(null);
   const [partnerDbId, setPartnerDbId] = useState<string | null>(null);
@@ -63,6 +78,8 @@ export default function Dashboard() {
   const [tgFinding, setTgFinding] = useState(false);
   const [tgSaving, setTgSaving] = useState(false);
   const [tgSaved, setTgSaved] = useState(false);
+  const [liveMessages, setLiveMessages] = useState<MessageRow[]>([]);
+  const [channelConfigRows, setChannelConfigRows] = useState<ChannelConfigRow[]>([]);
 
   useEffect(() => {
     getSession().then(async (session) => {
@@ -137,6 +154,25 @@ export default function Dashboard() {
       }
     });
   }, []);
+
+  // Live data for stat tiles, weekly chart, monthly reports, and the
+  // activity feed — replaces the old hardcoded mock/dashboard.ts numbers.
+  useEffect(() => {
+    if (!partnerDbId) return;
+    (async () => {
+      const [{ data: msgs }, { data: configs }] = await Promise.all([
+        supabase
+          .from("messages")
+          .select("channel, direction, sender_id, sender_name, status, created_at")
+          .eq("partner_id", partnerDbId),
+        partnerIdState
+          ? supabase.from("channel_configs").select("channel_id, created_at").eq("partner_id", partnerIdState)
+          : Promise.resolve({ data: [] as ChannelConfigRow[] }),
+      ]);
+      setLiveMessages((msgs as MessageRow[]) ?? []);
+      setChannelConfigRows((configs as ChannelConfigRow[]) ?? []);
+    })();
+  }, [partnerDbId, partnerIdState]);
 
   const showToast = (msg: string) => { setToastMessage(msg); setTimeout(() => setToastMessage(null), 2500); };
 
@@ -337,7 +373,8 @@ export default function Dashboard() {
     const pid = partnerIdState || "<your-partner-id>";
     const lines: string[] = [];
     lines.push("// 1. Install: npm install react-native-webview");
-    lines.push("// 2. Copy sdk/react-native/src/OPSConnectWidget.tsx into your project");
+    lines.push("// 2. Save the downloaded file as OPSConnectWidget.tsx in your");
+    lines.push("//    project root — the same folder as App.tsx");
     lines.push("// 3. Use the component:");
     lines.push("");
     lines.push("import React, { useState } from 'react';");
@@ -410,6 +447,91 @@ export default function Dashboard() {
     setTimeout(() => setWidgetRnCopied(false), 2000);
   };
 
+  const handleDownloadReactNativeWidget = () => {
+    const blob = new Blob([opsConnectWidgetSource], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "OPSConnectWidget.tsx";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // Sends a real Telegram message via the partner's saved bot token and
+  // records it in `messages`. Returns whether it actually succeeded.
+  const testTelegramChannel = useCallback(async (): Promise<{ ok: boolean; error?: string }> => {
+    if (!partnerDbId) return { ok: false, error: "Partner not loaded yet." };
+    const { data, error } = await supabase.functions.invoke("test-telegram-channel", {
+      body: { partner_id: partnerDbId },
+    });
+    if (error) return { ok: false, error: error.message };
+    return data as { ok: boolean; error?: string };
+  }, [partnerDbId]);
+
+  const handleTestConnection = async (channelId: string) => {
+    const channel = partnerChannels.find((ch) => ch.id === channelId);
+    setTestStates((prev) => ({ ...prev, [channelId]: "testing" }));
+
+    if (REAL_TEST_CHANNELS.has(channelId)) {
+      const result = await testTelegramChannel();
+      setTestStates((prev) => ({ ...prev, [channelId]: result.ok ? "success" : "error" }));
+      showToast(
+        result.ok
+          ? `Test message sent through ${channel?.name || "channel"} successfully!`
+          : (result.error || `Test failed for ${channel?.name || "channel"}.`)
+      );
+    } else {
+      // No stored credential to test against for this channel yet — say so
+      // honestly instead of faking a result.
+      setTestStates((prev) => ({ ...prev, [channelId]: "unverified" }));
+      showToast(`Automatic testing isn't available for ${channel?.name || "this channel"} yet — send a real message to confirm it's working.`);
+    }
+    setTimeout(() => { setTestStates((prev) => { const next = { ...prev }; delete next[channelId]; return next; }); }, 3000);
+  };
+
+  const handleBulkTestAll = useCallback(() => {
+    const connected = partnerChannels.filter((ch) => configuredChannels.has(ch.id));
+    if (connected.length === 0) { showToast("No connected channels to test."); return; }
+    const entries: BulkTestEntry[] = connected.map((ch) => ({ channelId: ch.id, status: "idle" as TestState }));
+    setBulkTest({ running: true, entries });
+
+    const runSequential = async () => {
+      let verified = 0;
+      let unverified = 0;
+      for (let i = 0; i < entries.length; i++) {
+        setBulkTest((prev) => {
+          const updated = [...prev.entries];
+          updated[i] = { ...updated[i], status: "testing" };
+          return { ...prev, entries: updated };
+        });
+
+        let status: TestState;
+        if (REAL_TEST_CHANNELS.has(entries[i].channelId)) {
+          const result = await testTelegramChannel();
+          status = result.ok ? "success" : "error";
+          if (result.ok) verified++;
+        } else {
+          status = "unverified";
+          unverified++;
+        }
+
+        setBulkTest((prev) => {
+          const updated = [...prev.entries];
+          updated[i] = { ...updated[i], status };
+          return { ...prev, entries: updated };
+        });
+      }
+      setBulkTest((prev) => ({ ...prev, running: false }));
+      showToast(
+        `Bulk test complete: ${verified}/${entries.length} verified` +
+        (unverified > 0 ? `, ${unverified} need manual verification` : "") + "."
+      );
+    };
+    runSequential();
+  }, [configuredChannels, testTelegramChannel]);
+
   const generateReport = (channelId: string): string => {
     const data = metrics?.monthlyReport[channelId];
     const channel = partnerChannels.find((c) => c.id === channelId);
@@ -427,9 +549,11 @@ ${monthName} ${year}
 SUMMARY
 -----------------------------------------
 Total Messages:    ${data.totalMessages.toLocaleString()}
-vs Last Month:     ${data.vsLastMonthPct == null ? "N/A" : (data.vsLastMonthPct >= 0 ? "+" : "") + data.vsLastMonthPct.toFixed(1) + "%"}
-Peak Hour:         ${data.peakHour}
-Top Contact:       ${data.topContact}
+Delivered:         ${data.delivered.toLocaleString()}
+Delivered Rate:    ${data.totalMessages > 0 ? ((data.delivered / data.totalMessages) * 100).toFixed(2) : "0.00"}%
+Avg Response Time: ${data.avgResponseMin} minutes
+Peak Hours:        ${data.peakHours}
+Top Customer:      ${data.topCustomer}
 
 CHANNEL DETAILS
 -----------------------------------------
@@ -458,9 +582,11 @@ ${date.toISOString().split("T")[0]}
       "Metric,Value",
       `Channel,${channel.name}`,
       `Total Messages,${data.totalMessages}`,
-      `vs Last Month,${data.vsLastMonthPct == null ? "N/A" : data.vsLastMonthPct.toFixed(1) + "%"}`,
-      `Peak Hour,${data.peakHour}`,
-      `Top Contact,${data.topContact}`,
+      `Delivered,${data.delivered}`,
+      `Delivered Rate,${data.totalMessages > 0 ? ((data.delivered / data.totalMessages) * 100).toFixed(2) : "0.00"}%`,
+      `Avg Response Time (min),${data.avgResponseMin}`,
+      `Peak Hours,${data.peakHours}`,
+      `Top Customer,${data.topCustomer}`,
     ];
     const csvContent = csvRows.join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -507,6 +633,13 @@ ${date.toISOString().split("T")[0]}
   const connectedArray = partnerChannels.filter((ch) => configuredChannels.has(ch.id));
   const disconnectedArray = partnerChannels.filter((ch) => !configuredChannels.has(ch.id));
 
+  const connectedChannelIds = connectedArray.map((ch) => ch.id);
+  const { stats: dashboardStats, channelMetrics, analyticsTrends, monthlyReportData, recentActivity } = useMemo(
+    () => computeDashboardAnalytics(liveMessages, channelConfigRows, connectedChannelIds),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [liveMessages, channelConfigRows, configuredChannels]
+  );
+
   return (
     <>
       <Navbar />
@@ -549,6 +682,52 @@ ${date.toISOString().split("T")[0]}
               </div>
             )}
 
+            {/* Bulk Test Progress */}
+            {bulkTest.running && (
+              <div className="bg-background-100 rounded-xl border border-background-200/70 p-5 mb-8">
+                <h3 className="text-sm font-semibold text-foreground-900 mb-4">Bulk Test Progress</h3>
+                <div className="space-y-2">
+                  {bulkTest.entries.map((entry) => {
+                    const channel = partnerChannels.find((c) => c.id === entry.channelId);
+                    return (
+                      <div key={entry.channelId} className="flex items-center gap-3 bg-background-50 rounded-lg px-4 py-2.5">
+                        <div className="w-7 h-7 flex items-center justify-center rounded-md" style={{ backgroundColor: (channel?.color || "#999") + "20" }}>
+                          <i className={`${channel?.icon || "ri-question-line"} text-xs`} style={{ color: channel?.color || "#999" }}></i>
+                        </div>
+                        <span className="flex-1 text-xs font-medium text-foreground-800">{channel?.name || entry.channelId}</span>
+                        <div className="flex items-center gap-2">
+                          {entry.status === "idle" && <span className="text-xs text-foreground-400">Waiting...</span>}
+                          {entry.status === "testing" && <span className="flex items-center gap-1.5 text-xs text-foreground-500"><span className="w-3 h-3 border-2 border-primary-500 border-t-transparent rounded-full animate-spin"/> Testing</span>}
+                          {entry.status === "success" && <span className="flex items-center gap-1 text-xs text-accent-600"><i className="ri-checkbox-circle-line"></i> Passed</span>}
+                          {entry.status === "error" && <span className="flex items-center gap-1 text-xs text-red-500"><i className="ri-close-circle-line"></i> Failed</span>}
+                          {entry.status === "unverified" && <span className="flex items-center gap-1 text-xs text-amber-600"><i className="ri-question-line"></i> Manual only</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Section Tabs */}
+            <div className="flex items-center gap-1.5 mb-6 border-b border-background-200/70 overflow-x-auto">
+              {DASHBOARD_TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-1.5 text-sm font-semibold whitespace-nowrap cursor-pointer px-4 py-2.5 border-b-2 transition-colors ${
+                    activeTab === tab.id
+                      ? "border-primary-500 text-primary-600"
+                      : "border-transparent text-foreground-500 hover:text-foreground-800"
+                  }`}
+                >
+                  <i className={tab.icon}></i> {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {activeTab === "overview" && (
+            <>
             {/* Stats Row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
               {(metricsLoading ? [] : [
@@ -590,10 +769,14 @@ ${date.toISOString().split("T")[0]}
                 <div key={i} className="bg-background-100 rounded-xl border border-background-200/70 p-5 h-[92px] animate-pulse" />
               ))}
             </div>
+            </>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Left: Connected Channels + Analytics */}
               <div className="lg:col-span-2 space-y-6">
+                {activeTab === "overview" && (
+                <>
                 {/* Connected Channels */}
                 <div>
                   <div className="flex items-center justify-between mb-4">
@@ -639,6 +822,31 @@ ${date.toISOString().split("T")[0]}
                                 </div>
                               </div>
                               <div className="flex items-center gap-1.5">
+                                <button
+                                  onClick={() => handleTestConnection(channel.id)}
+                                  disabled={!!testState}
+                                  className={`text-xs font-medium whitespace-nowrap cursor-pointer px-3 py-1.5 rounded-md transition-colors ${
+                                    testState === "success"
+                                      ? "bg-accent-100 text-accent-600"
+                                      : testState === "error"
+                                        ? "bg-red-100 text-red-600"
+                                        : testState === "unverified"
+                                          ? "bg-amber-100 text-amber-700"
+                                          : "bg-secondary-100 text-secondary-700 hover:bg-secondary-200"
+                                  }`}
+                                >
+                                  {testState === "testing" ? (
+                                    <span className="flex items-center gap-1.5"><span className="w-3 h-3 border-2 border-secondary-500 border-t-transparent rounded-full animate-spin" /> Testing</span>
+                                  ) : testState === "success" ? (
+                                    <span className="flex items-center gap-1"><i className="ri-check-line"></i> Passed</span>
+                                  ) : testState === "error" ? (
+                                    <span className="flex items-center gap-1"><i className="ri-close-line"></i> Failed</span>
+                                  ) : testState === "unverified" ? (
+                                    <span className="flex items-center gap-1"><i className="ri-question-line"></i> Manual only</span>
+                                  ) : (
+                                    <span className="flex items-center gap-1"><i className="ri-send-plane-line text-[10px]"></i> Test</span>
+                                  )}
+                                </button>
                                 <button onClick={() => setDisconnectModal(channel.id)} className="text-xs font-medium whitespace-nowrap cursor-pointer px-3 py-1.5 rounded-md text-foreground-500 hover:text-red-500 hover:bg-red-50 transition-colors">
                                   Disconnect
                                 </button>
@@ -751,6 +959,11 @@ ${date.toISOString().split("T")[0]}
                   </div>
                 )}
 
+                </>
+                )}
+
+                {activeTab === "channels" && (
+                <>
                 {/* Available Channels */}
                 {disconnectedArray.length > 0 && (
                   <div>
@@ -808,20 +1021,18 @@ ${date.toISOString().split("T")[0]}
                                   </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-2 mb-3">
+                                <div className="grid grid-cols-3 gap-2 mb-3">
                                   <div className="bg-background-100 rounded p-2">
-                                    <p className="text-[10px] text-foreground-400">vs Last Month</p>
-                                    <p className="text-xs font-bold text-foreground-800">
-                                      {data.vsLastMonthPct == null ? "—" : `${data.vsLastMonthPct >= 0 ? "+" : ""}${data.vsLastMonthPct.toFixed(1)}%`}
-                                    </p>
+                                    <p className="text-[10px] text-foreground-400">Delivered</p>
+                                    <p className="text-xs font-bold text-foreground-800">{data.totalMessages > 0 ? ((data.delivered / data.totalMessages) * 100).toFixed(1) : "0.0"}%</p>
                                   </div>
                                   <div className="bg-background-100 rounded p-2">
                                     <p className="text-[10px] text-foreground-400">Peak Hour</p>
                                     <p className="text-xs font-bold text-foreground-800 truncate">{data.peakHour}</p>
                                   </div>
-                                  <div className="bg-background-100 rounded p-2 col-span-2">
-                                    <p className="text-[10px] text-foreground-400">Top Contact</p>
-                                    <p className="text-xs font-bold text-foreground-800 truncate">{data.topContact}</p>
+                                  <div className="bg-background-100 rounded p-2">
+                                    <p className="text-[10px] text-foreground-400">Peak</p>
+                                    <p className="text-xs font-bold text-foreground-800 truncate">{data.peakHours.split(" ")[0]}</p>
                                   </div>
                                 </div>
 
@@ -847,12 +1058,22 @@ ${date.toISOString().split("T")[0]}
                     )}
                   </div>
                 )}
+                </>
+                )}
+
+                {activeTab === "inbox" && (
+                <>
                 {/* Support Requests — from the embedded chat widget */}
                 <SupportRequests partnerId={partnerIdState} />
 
                 {/* Chat Report */}
                 <ChatReport partnerId={partnerDbId} partnerTextId={partnerIdState} />
 
+                </>
+                )}
+
+                {activeTab === "setup" && (
+                <>
                 {/* AI Chat Setup */}
                 <div>
                   <div className="flex items-center justify-between mb-4">
@@ -1222,10 +1443,16 @@ ${date.toISOString().split("T")[0]}
                         <div>
                           <p className="text-xs font-semibold uppercase tracking-widest text-foreground-400 mb-3">4 — React Native SDK</p>
                           <p className="text-xs text-foreground-500 mb-3">
-                            Install <code className="bg-background-200 px-1 rounded text-[11px]">react-native-webview</code>, copy{" "}
-                            <code className="bg-background-200 px-1 rounded text-[11px]">sdk/react-native/src/OPSConnectWidget.tsx</code>{" "}
-                            from this repo into your project, then use the snippet below.
+                            Install <code className="bg-background-200 px-1 rounded text-[11px]">react-native-webview</code>, download{" "}
+                            <code className="bg-background-200 px-1 rounded text-[11px]">OPSConnectWidget.tsx</code>{" "}
+                            below and save it in your <b>project root — the same folder as App.tsx</b> (or your entry component), then use the snippet below it as-is.
                           </p>
+                          <button
+                            onClick={handleDownloadReactNativeWidget}
+                            className="mb-3 text-xs font-semibold px-3 py-2 rounded-lg border border-primary-400 text-primary-600 hover:bg-primary-50 transition-colors cursor-pointer whitespace-nowrap flex items-center gap-1.5"
+                          >
+                            <i className="ri-download-2-line"></i> Download OPSConnectWidget.tsx
+                          </button>
                           <div className="relative">
                             <pre className="bg-foreground-950 text-accent-300 text-[11px] font-mono rounded-xl p-4 overflow-x-auto leading-relaxed whitespace-pre max-h-72">{generateReactNativeSnippet()}</pre>
                             <button
@@ -1290,6 +1517,8 @@ ${date.toISOString().split("T")[0]}
                       </div>
                     )}
                   </div>
+                )}
+                </>
                 )}
               </div>
 
