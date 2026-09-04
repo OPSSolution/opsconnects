@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { getSession, signUp } from "@/utils/auth";
 
 function dashboardFor(role: string) {
-  if (role === "admin") return "/admin";
+  if (role === "admin") return "/panel-d0b65d43";
   if (role === "agent") return "/agent";
   if (role === "viewer") return "/viewer";
   return "/dashboard";

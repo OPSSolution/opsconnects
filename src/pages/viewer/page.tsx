@@ -78,7 +78,7 @@ export default function ViewerDashboard() {
   useEffect(() => {
     getSession().then((s) => {
       if (!s) { navigate("/login", { replace: true }); return; }
-      if (s.role !== "viewer") { navigate(s.role === "admin" ? "/admin" : s.role === "agent" ? "/agent" : "/dashboard", { replace: true }); return; }
+      if (s.role !== "viewer") { navigate(s.role === "admin" ? "/panel-d0b65d43" : s.role === "agent" ? "/agent" : "/dashboard", { replace: true }); return; }
       setPartnerName(s.partnerName);
       setViewerName(s.agentName ?? s.email);
       setPartnerId(s.partnerId);

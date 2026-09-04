@@ -48,7 +48,7 @@ export default function AgentDashboard() {
   useEffect(() => {
     getSession().then(async (s) => {
       if (!s) { navigate("/login", { replace: true }); return; }
-      if (s.role !== "agent") { navigate(s.role === "admin" ? "/admin" : s.role === "viewer" ? "/viewer" : "/dashboard", { replace: true }); return; }
+      if (s.role !== "agent") { navigate(s.role === "admin" ? "/panel-d0b65d43" : s.role === "viewer" ? "/viewer" : "/dashboard", { replace: true }); return; }
       setAgentName(s.agentName ?? s.email);
       setPartnerId(s.partnerId);
       setPartnerName(s.partnerName);

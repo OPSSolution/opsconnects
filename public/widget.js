@@ -352,6 +352,11 @@
     '#_ocw_lv_idle p{font-size:12px;color:#6b7280;margin:0;line-height:1.6;max-width:220px}' +
     '#_ocw_lv_connect{padding:10px 28px;border-radius:24px;background:' + G + ';border:none;cursor:pointer;color:#fff;font-size:13px;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.15);transition:opacity .15s}' +
     '#_ocw_lv_connect:hover{opacity:.88}' +
+    '._ocw_rate{align-self:center;background:#fff;border-radius:14px;padding:14px 18px;box-shadow:0 1px 3px rgba(0,0,0,.07);text-align:center;max-width:90%}' +
+    '._ocw_rate p{font-size:12px;color:#374151;margin:0 0 8px}' +
+    '._ocw_rate_stars{display:flex;gap:4px;justify-content:center}' +
+    '._ocw_rate_star{background:none;border:none;cursor:pointer;font-size:24px;line-height:1;color:#d1d5db;padding:2px;font-family:inherit;transition:color .15s,transform .15s}' +
+    '._ocw_rate_star:hover,._ocw_rate_star.active{color:#f5b400;transform:scale(1.15)}' +
     // Language panel
     '#_ocw_lang_panel{flex:1;display:none;flex-direction:column;overflow:hidden;background:#f7f8fc}' +
     '#_ocw_lang_hdr{padding:14px 16px 10px;border-bottom:1px solid #e8eaed;background:#fff;flex-shrink:0}' +
@@ -753,16 +758,59 @@
       fetch(url)
         .then(function (r) { return r.json(); })
         .then(function (data) {
-          if (!data.messages || !data.messages.length) return;
-          data.messages.forEach(function (m) {
-            addLvMsg(m.content, false, (m.sender_name || 'Agent') + ' · Support');
-          });
-          pollSince = data.messages[data.messages.length - 1].created_at;
+          if (data.messages && data.messages.length) {
+            data.messages.forEach(function (m) {
+              addLvMsg(m.content, false, (m.sender_name || 'Agent') + ' · Support');
+            });
+            pollSince = data.messages[data.messages.length - 1].created_at;
+          }
+          if (data.status === 'closed' && liveStep !== 'closed') {
+            liveStep = 'closed';
+            stopPolling();
+            lvInp.disabled = true;
+            lvSnd.disabled = true;
+            lvInp.placeholder = 'This chat has ended';
+            addLvSys('This chat has ended.');
+            if (!data.rated) showRatingPrompt();
+          }
         })
         .catch(function () {});
     }, 3000);
   }
   function stopPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
+
+  function showRatingPrompt() {
+    var box = document.createElement('div');
+    box.className = '_ocw_rate';
+    box.innerHTML = '<p>How was your experience?</p><div class="_ocw_rate_stars"></div>';
+    var starsEl = box.querySelector('._ocw_rate_stars');
+    var stars = [];
+    for (var i = 1; i <= 5; i++) {
+      var btn = document.createElement('button');
+      btn.className = '_ocw_rate_star';
+      btn.type = 'button';
+      btn.textContent = '★';
+      (function (n, el) {
+        el.addEventListener('mouseenter', function () { highlightStars(stars, n); });
+        el.addEventListener('click', function () { submitRating(n, box); });
+      })(i, btn);
+      stars.push(btn);
+      starsEl.appendChild(btn);
+    }
+    starsEl.addEventListener('mouseleave', function () { highlightStars(stars, 0); });
+    appendScroll(lvMsgs, box);
+  }
+  function highlightStars(stars, n) {
+    stars.forEach(function (s, idx) { s.classList.toggle('active', idx < n); });
+  }
+  function submitRating(n, box) {
+    box.innerHTML = '<p>Thanks for your feedback!</p>';
+    fetch(cfg.api + '/live-chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'rate', chat_id: liveChatId, rating: n }),
+    }).catch(function () {});
+  }
 
   // ── Live connect flow ─────────────────────────────────────────────
   function autoConnect() {

@@ -47,7 +47,18 @@ Deno.serve(async (req: Request) => {
     if (error) {
       return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: CORS });
     }
-    return new Response(JSON.stringify({ messages: data ?? [] }), { headers: CORS });
+
+    const { data: chat } = await supabase
+      .from("live_chats")
+      .select("status, rating")
+      .eq("id", chatId)
+      .maybeSingle();
+
+    return new Response(JSON.stringify({
+      messages: data ?? [],
+      status:   chat?.status ?? null,
+      rated:    chat?.rating != null,
+    }), { headers: CORS });
   }
 
   if (req.method !== "POST") {
@@ -150,6 +161,30 @@ Deno.serve(async (req: Request) => {
       sender_name: visitorName ?? "Visitor",
       content,
     });
+
+    if (error) {
+      return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: CORS });
+    }
+    return new Response(JSON.stringify({ ok: true }), { headers: CORS });
+  }
+
+  // ── POST action=rate: visitor rates the chat after it's closed ─────────────
+  if (action === "rate") {
+    const chatId = body.chat_id as string | undefined;
+    const rating = body.rating  as number | undefined;
+
+    if (!chatId || !rating || rating < 1 || rating > 5) {
+      return new Response(
+        JSON.stringify({ error: "chat_id and rating (1-5) required" }),
+        { status: 400, headers: CORS }
+      );
+    }
+
+    const { error } = await supabase
+      .from("live_chats")
+      .update({ rating, rated_at: new Date().toISOString() })
+      .eq("id", chatId)
+      .is("rating", null);
 
     if (error) {
       return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: CORS });

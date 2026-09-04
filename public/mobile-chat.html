@@ -199,6 +199,25 @@
     }
     .chip:hover, .chip.active { background: var(--c1); color: #fff; }
 
+    /* ── Rating prompt ── */
+    .rate-box {
+      align-self: center;
+      background: #fff;
+      border-radius: 14px;
+      padding: 14px 18px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.07);
+      text-align: center;
+      max-width: 90%;
+    }
+    .rate-box p { font-size: 12px; color: #374151; margin-bottom: 8px; }
+    .rate-stars { display: flex; gap: 4px; justify-content: center; }
+    .rate-star {
+      background: none; border: none; cursor: pointer;
+      font-size: 24px; line-height: 1; color: #d1d5db;
+      padding: 2px; font-family: inherit; transition: color .15s, transform .15s;
+    }
+    .rate-star:hover, .rate-star.active { color: #f5b400; transform: scale(1.15); }
+
     /* ── Footer ── */
     .ftr {
       display: flex;
@@ -599,13 +618,58 @@
     fetch(url)
       .then(function (r) { return r.json(); })
       .then(function (data) {
-        if (!data.messages || !data.messages.length) return;
-        data.messages.forEach(function (m) {
-          addMsg(lvMsgs, (m.sender_name || 'Agent') + ': ' + m.content, 'msg-bot');
-        });
-        pollSince = data.messages[data.messages.length - 1].created_at;
+        if (data.messages && data.messages.length) {
+          data.messages.forEach(function (m) {
+            addMsg(lvMsgs, (m.sender_name || 'Agent') + ': ' + m.content, 'msg-bot');
+          });
+          pollSince = data.messages[data.messages.length - 1].created_at;
+        }
+        if (data.status === 'closed' && lvStep !== 'closed') {
+          lvStep = 'closed';
+          clearInterval(pollTimer);
+          setLvReady(false);
+          lvInp.placeholder = 'This chat has ended';
+          addMsg(lvMsgs, 'This chat has ended.', 'msg-sys');
+          if (!data.rated) showRatingPrompt();
+        }
       })
       .catch(function () {});
+  }
+
+  function showRatingPrompt() {
+    var box = document.createElement('div');
+    box.className = 'rate-box';
+    box.innerHTML = '<p>How was your experience?</p><div class="rate-stars"></div>';
+    var starsEl = box.querySelector('.rate-stars');
+    var stars = [];
+    for (var i = 1; i <= 5; i++) {
+      var btn = document.createElement('button');
+      btn.className = 'rate-star';
+      btn.textContent = '★';
+      btn.type = 'button';
+      (function (n, el) {
+        el.addEventListener('mouseenter', function () { highlightStars(stars, n); });
+        el.addEventListener('click', function () { submitRating(n, box); });
+      })(i, btn);
+      stars.push(btn);
+      starsEl.appendChild(btn);
+    }
+    starsEl.addEventListener('mouseleave', function () { highlightStars(stars, 0); });
+    lvMsgs.appendChild(box);
+    scrollEnd(lvMsgs);
+  }
+
+  function highlightStars(stars, n) {
+    stars.forEach(function (s, idx) { s.classList.toggle('active', idx < n); });
+  }
+
+  function submitRating(n, box) {
+    box.innerHTML = '<p>Thanks for your feedback!</p>';
+    fetch(cfg.api + '/live-chat', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ action: 'rate', chat_id: chatId, rating: n }),
+    }).catch(function () {});
   }
 
   lvSnd.addEventListener('click', sendLv);

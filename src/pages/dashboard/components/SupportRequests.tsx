@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/utils/supabase/client";
+import { downloadCSV, fmtDateTime } from "@/utils/csv";
 
 const PAGE_SIZE = 20;
 
@@ -18,9 +19,11 @@ interface SupportRequest {
   visitor_name: string;
   visitor_contact: string;
   company: string | null;
+  topic: string | null;
   message: string;
   status: "new" | "read" | "resolved";
   created_at: string;
+  resolved_at: string | null;
 }
 
 function fmtDate(iso: string) {
@@ -62,25 +65,44 @@ export default function SupportRequests({ partnerId }: Props) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [search, setSearch]       = useState("");
   const [searchInput, setSearchInput] = useState("");
+  const [dateFrom, setDateFrom]   = useState("");
+  const [dateTo, setDateTo]       = useState("");
   const [updating, setUpdating]   = useState<string | null>(null);
   const [newCount, setNewCount]   = useState(0);
+  const [exporting, setExporting] = useState(false);
+
+  const buildQuery = useCallback(() => {
+    let q = supabase.from("support_requests").select("*", { count: "exact" }).eq("partner_id", partnerId);
+    if (statusFilter !== "all") q = q.eq("status", statusFilter);
+    if (search) q = q.or(`visitor_name.ilike.%${search}%,visitor_contact.ilike.%${search}%,company.ilike.%${search}%,message.ilike.%${search}%`);
+    if (dateFrom) q = q.gte("created_at", new Date(dateFrom).toISOString());
+    if (dateTo)   q = q.lte("created_at", new Date(dateTo + "T23:59:59.999").toISOString());
+    return q;
+  }, [partnerId, statusFilter, search, dateFrom, dateTo]);
 
   const fetchRequests = useCallback(async () => {
     if (!partnerId) return;
     setLoading(true);
-    let q = supabase
-      .from("support_requests")
-      .select("*", { count: "exact" })
-      .eq("partner_id", partnerId)
+    const { data, count } = await buildQuery()
       .order("created_at", { ascending: false })
       .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
-    if (statusFilter !== "all") q = q.eq("status", statusFilter);
-    if (search) q = q.or(`visitor_name.ilike.%${search}%,visitor_contact.ilike.%${search}%,company.ilike.%${search}%,message.ilike.%${search}%`);
-    const { data, count } = await q;
     setRequests((data as SupportRequest[]) ?? []);
     setTotal(count ?? 0);
     setLoading(false);
-  }, [partnerId, page, statusFilter, search]);
+  }, [partnerId, page, buildQuery]);
+
+  const exportRequests = async () => {
+    if (!partnerId) return;
+    setExporting(true);
+    const { data } = await buildQuery().order("created_at", { ascending: false }).limit(5000);
+    const rows = (data as SupportRequest[]) ?? [];
+    downloadCSV(
+      `support-requests-${new Date().toISOString().slice(0, 10)}.csv`,
+      ["Date/Time", "Visitor Name", "Contact", "Company", "Topic", "Message", "Status", "Resolved At"],
+      rows.map((r) => [fmtDateTime(r.created_at), r.visitor_name, r.visitor_contact, r.company, r.topic, r.message, r.status, fmtDateTime(r.resolved_at)])
+    );
+    setExporting(false);
+  };
 
   const fetchNewCount = useCallback(async () => {
     if (!partnerId) return;
@@ -98,7 +120,9 @@ export default function SupportRequests({ partnerId }: Props) {
 
   const updateStatus = async (id: string, status: "read" | "resolved") => {
     setUpdating(id);
-    await supabase.from("support_requests").update({ status }).eq("id", id);
+    await supabase.from("support_requests")
+      .update({ status, resolved_at: status === "resolved" ? new Date().toISOString() : null })
+      .eq("id", id);
     setRequests((prev) => prev.map((r) => r.id === id ? { ...r, status } : r));
     setUpdating(null);
     fetchNewCount();
@@ -163,6 +187,26 @@ export default function SupportRequests({ partnerId }: Props) {
                 Search
               </button>
             </div>
+
+            {/* Date range */}
+            <div className="flex items-center gap-1.5">
+              <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(0); }}
+                className="text-xs bg-background-50 border border-background-200/70 rounded-lg px-2 py-1.5 text-foreground-700 outline-none focus:border-primary-400" />
+              <span className="text-xs text-foreground-400">to</span>
+              <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(0); }}
+                className="text-xs bg-background-50 border border-background-200/70 rounded-lg px-2 py-1.5 text-foreground-700 outline-none focus:border-primary-400" />
+              {(dateFrom || dateTo) && (
+                <button onClick={() => { setDateFrom(""); setDateTo(""); setPage(0); }} className="text-foreground-400 hover:text-foreground-600 cursor-pointer text-xs">
+                  <i className="ri-close-line" />
+                </button>
+              )}
+            </div>
+
+            <button onClick={exportRequests} disabled={exporting || !total}
+              className="text-xs font-medium bg-background-50 border border-background-200/70 text-foreground-600 hover:text-foreground-900 hover:bg-background-100 transition-colors whitespace-nowrap cursor-pointer px-3 py-1.5 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1">
+              {exporting ? <span className="w-3 h-3 border-2 border-foreground-400 border-t-transparent rounded-full animate-spin" /> : <i className="ri-download-2-line" />}
+              Export CSV
+            </button>
           </div>
 
           <p className="text-xs text-foreground-500">

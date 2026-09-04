@@ -8,7 +8,7 @@ interface AuthGuardProps {
 }
 
 function homeFor(role: string) {
-  if (role === "admin")  return "/admin";
+  if (role === "admin")  return "/panel-d0b65d43";
   if (role === "agent")  return "/agent";
   if (role === "viewer") return "/viewer";
   return "/dashboard";

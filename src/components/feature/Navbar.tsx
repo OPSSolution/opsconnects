@@ -87,7 +87,7 @@ export default function Navbar() {
         {/* Admin links */}
         {isAdmin && (
           <div className="hidden md:flex items-center gap-6">
-            <Link to="/admin" className="text-sm font-medium text-white/80 hover:text-white transition-colors">
+            <Link to="/panel-d0b65d43" className="text-sm font-medium text-white/80 hover:text-white transition-colors">
               Admin Panel
             </Link>
           </div>
@@ -165,7 +165,7 @@ export default function Navbar() {
             )}
 
             {isAdmin && (
-              <Link to="/admin" onClick={() => setMobileOpen(false)} className="text-sm font-medium text-foreground-700 hover:text-foreground-950 py-2">Admin Panel</Link>
+              <Link to="/panel-d0b65d43" onClick={() => setMobileOpen(false)} className="text-sm font-medium text-foreground-700 hover:text-foreground-950 py-2">Admin Panel</Link>
             )}
 
             <div className="border-t border-background-200/70 pt-3 mt-1 flex flex-col gap-2">
