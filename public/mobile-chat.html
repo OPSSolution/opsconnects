@@ -380,6 +380,13 @@
     instagram: 'https://ig.me/m/',
     email:     'mailto:',
   };
+  function normalizeUrl(val, base) {
+    if (!val) return '#';
+    var v = val.trim().replace(/^@/, '');
+    if (/^https?:\/\//i.test(v) || /^mailto:/i.test(v)) return v;
+    if (/^[a-zA-Z0-9-]+\.[a-zA-Z]+\//.test(v)) return 'https://' + v;
+    return base + v;
+  }
   var sbCh = document.querySelector('#sb-channels');
   var hasChannels = false;
   ['messenger','whatsapp','telegram','line','instagram','email'].forEach(function(k) {
@@ -387,7 +394,7 @@
     if (!hasChannels) { sbCh.innerHTML = '<div class="sbd"></div>'; hasChannels = true; }
     var a = document.createElement('a');
     a.className = 'sbi';
-    a.href = chLinks[k] + cfg[k];
+    a.href = normalizeUrl(cfg[k], chLinks[k]);
     a.target = '_blank'; a.rel = 'noopener';
     a.title = k.charAt(0).toUpperCase() + k.slice(1);
     a.innerHTML = chSVGs[k];
