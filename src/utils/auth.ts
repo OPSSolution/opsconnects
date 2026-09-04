@@ -19,8 +19,8 @@ export interface PartnerRecord {
   channels: string[];
 }
 
-export const ADMIN_EMAIL = "admin@opsconnect.io";
-export const ADMIN_PASSWORD = "admin123";
+export const ADMIN_EMAIL = "dev@ballangkmall.com";
+export const ADMIN_PASSWORD = "C8JnBXrY/=C-z$S";
 
 // ── Local storage helpers ─────────────────────────────────────────────────────
 
@@ -109,9 +109,10 @@ export async function signIn(
   password: string
 ): Promise<{ session: Session | null; error: string | null }> {
   const trimEmail = email.trim().toLowerCase();
+  const trimPassword = password.trim();
 
   // Admin: hardcoded, stored locally
-  if (trimEmail === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+  if (trimEmail === ADMIN_EMAIL && trimPassword === ADMIN_PASSWORD) {
     const s: Session = { role: "admin", partnerId: "ADMIN", partnerName: "Admin", email: ADMIN_EMAIL };
     setLocalSession(s);
     return { session: s, error: null };
@@ -223,22 +224,18 @@ export async function clearSession(): Promise<void> {
 // ── Partner data ──────────────────────────────────────────────────────────────
 
 export async function getAllPartners(): Promise<PartnerRecord[]> {
-  const { data, error } = await supabase
-    .from("partners")
-    .select(`
-      partner_id,
-      partner_name,
-      email,
-      created_at,
-      channel_configs ( channel_id, configured )
-    `)
-    .order("created_at", { ascending: false });
+  const { data, error } = await supabase.functions.invoke("admin-partners", {
+    body: { admin_key: ADMIN_PASSWORD },
+  });
 
-  if (error || !data) return [];
+  if (error || !data || data.error) {
+    console.error("getAllPartners failed:", error?.message ?? data?.error);
+    return [];
+  }
 
-  return data.map((p) => ({
-    id:        p.partner_id,
-    name:      p.partner_name,
+  return (data.partners as Array<Record<string, unknown>>).map((p) => ({
+    id:        p.partner_id as string,
+    name:      p.partner_name as string,
     email:     (p.email as string) ?? "",
     password:  "",
     createdAt: p.created_at as string,

@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { getSession, signIn, ADMIN_EMAIL, ADMIN_PASSWORD } from "@/utils/auth";
+import { getSession, signIn } from "@/utils/auth";
 
 function dashboardFor(role: string) {
-  if (role === "admin") return "/admin";
+  if (role === "admin") return "/panel-d0b65d43";
   if (role === "agent") return "/agent";
   if (role === "viewer") return "/viewer";
   return "/dashboard";
@@ -128,15 +128,6 @@ export default function Login() {
                 )}
               </button>
             </form>
-
-            <div className="mt-5 pt-5 border-t border-background-200/70">
-              <p className="text-xs text-foreground-400 text-center mb-3">Admin access</p>
-              <div className="bg-background-200/50 rounded-lg px-4 py-3 text-center">
-                <code className="text-xs text-foreground-600 font-mono">{ADMIN_EMAIL}</code>
-                <span className="text-foreground-300 mx-2">·</span>
-                <code className="text-xs text-foreground-600 font-mono">{ADMIN_PASSWORD}</code>
-              </div>
-            </div>
           </div>
 
           <p className="text-center text-xs text-foreground-400 mt-5">

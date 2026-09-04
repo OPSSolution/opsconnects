@@ -1,17 +1,14 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import Navbar from "@/components/feature/Navbar";
 import Footer from "@/components/feature/Footer";
 import { partnerChannels } from "@/mocks/partners";
-import { dashboardStats, channelMetrics, recentActivity, analyticsTrends, monthlyReportData } from "@/mocks/dashboard";
 import { getSession, getPartnerChannels } from "@/utils/auth";
 import { supabase } from "@/utils/supabase/client";
+import { getDashboardMetrics, DashboardMetrics } from "@/utils/dashboardData";
 import ChatReport from "./components/ChatReport";
 import SupportRequests from "./components/SupportRequests";
 import LiveChat from "./components/LiveChat";
-
-type TestState = "idle" | "testing" | "success" | "error";
-type BulkTestEntry = { channelId: string; status: TestState };
 
 const channelIcons: Record<string, string> = {
   whatsapp: "ri-whatsapp-line", telegram: "ri-telegram-line", messenger: "ri-messenger-line",
@@ -24,10 +21,18 @@ const channelColors: Record<string, string> = {
   livechat: "#1E7FC2", wechat: "#07C160",
 };
 
+function timeAgo(iso: string) {
+  const secs = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (secs < 60) return `${secs}s ago`;
+  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
+  if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`;
+  return `${Math.floor(secs / 86400)}d ago`;
+}
+
 export default function Dashboard() {
   const [configuredChannels, setConfiguredChannels] = useState<Set<string>>(new Set());
-  const [testStates, setTestStates] = useState<Record<string, TestState>>({});
-  const [bulkTest, setBulkTest] = useState<{ running: boolean; entries: BulkTestEntry[] }>({ running: false, entries: [] });
+  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+  const [metricsLoading, setMetricsLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [disconnectModal, setDisconnectModal] = useState<string | null>(null);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
@@ -94,7 +99,16 @@ export default function Dashboard() {
         // Load channels from Supabase (falls back to localStorage if needed)
         const channels = await getPartnerChannels(session.partnerId);
         setConfiguredChannels(new Set(channels));
+
+        if (session.partnerDbId) {
+          try {
+            const m = await getDashboardMetrics(session.partnerDbId, session.partnerId, channels);
+            setMetrics(m);
+          } catch (e) { console.error("Failed to load dashboard metrics:", e); }
+        }
+        setMetricsLoading(false);
       } else {
+        setMetricsLoading(false);
         // Fallback: localStorage (covers channels added via wizard before Supabase)
         const ids = new Set<string>();
         if (localStorage.getItem("omni_wa_configured") === "true") ids.add("whatsapp");
@@ -396,45 +410,8 @@ export default function Dashboard() {
     setTimeout(() => setWidgetRnCopied(false), 2000);
   };
 
-  const handleTestConnection = (channelId: string) => {
-    setTestStates((prev) => ({ ...prev, [channelId]: "testing" }));
-    setTimeout(() => {
-      setTestStates((prev) => ({ ...prev, [channelId]: "success" }));
-      const channel = partnerChannels.find((ch) => ch.id === channelId);
-      showToast(`Test message sent through ${channel?.name || "channel"} successfully!`);
-      setTimeout(() => { setTestStates((prev) => { const next = { ...prev }; delete next[channelId]; return next; }); }, 3000);
-    }, 1200 + Math.random() * 800);
-  };
-
-  const handleBulkTestAll = useCallback(() => {
-    const connected = partnerChannels.filter((ch) => configuredChannels.has(ch.id));
-    if (connected.length === 0) { showToast("No connected channels to test."); return; }
-    const entries: BulkTestEntry[] = connected.map((ch) => ({ channelId: ch.id, status: "idle" as TestState }));
-    setBulkTest({ running: true, entries });
-
-    const runSequential = async () => {
-      for (let i = 0; i < entries.length; i++) {
-        setBulkTest((prev) => {
-          const updated = [...prev.entries];
-          updated[i] = { ...updated[i], status: "testing" };
-          return { ...prev, entries: updated };
-        });
-        await new Promise((r) => setTimeout(r, 1000 + Math.random() * 600));
-        setBulkTest((prev) => {
-          const updated = [...prev.entries];
-          updated[i] = { ...updated[i], status: Math.random() > 0.1 ? "success" : "error" };
-          return { ...prev, entries: updated };
-        });
-      }
-      setBulkTest((prev) => ({ ...prev, running: false }));
-      const passed = entries.filter((e) => e.status !== "error" || true).length;
-      showToast(`Bulk test complete: ${passed}/${entries.length} channels passed!`);
-    };
-    runSequential();
-  }, [configuredChannels]);
-
   const generateReport = (channelId: string): string => {
-    const data = monthlyReportData[channelId];
+    const data = metrics?.monthlyReport[channelId];
     const channel = partnerChannels.find((c) => c.id === channelId);
     if (!data || !channel) return "";
 
@@ -450,19 +427,16 @@ ${monthName} ${year}
 SUMMARY
 -----------------------------------------
 Total Messages:    ${data.totalMessages.toLocaleString()}
-Resolved:          ${data.resolved.toLocaleString()}
-Resolution Rate:   ${((data.resolved / data.totalMessages) * 100).toFixed(2)}%
-Avg Response Time: ${data.avgResponseMin} minutes
-CSAT Score:        ${data.csat}%
-Peak Hours:        ${data.peakHours}
-Top Customer:      ${data.topCustomer}
+vs Last Month:     ${data.vsLastMonthPct == null ? "N/A" : (data.vsLastMonthPct >= 0 ? "+" : "") + data.vsLastMonthPct.toFixed(1) + "%"}
+Peak Hour:         ${data.peakHour}
+Top Contact:       ${data.topContact}
 
 CHANNEL DETAILS
 -----------------------------------------
 Type:              ${channel.name}
-Connected Since:   ${channelMetrics[channelId]?.connectedSince || "N/A"}
-Messages Today:    ${channelMetrics[channelId]?.messagesToday.toLocaleString() || "N/A"}
-All-Time Messages: ${channelMetrics[channelId]?.totalMessages.toLocaleString() || "N/A"}
+Connected Since:   ${metrics?.channelMetrics[channelId]?.connectedSince ? new Date(metrics.channelMetrics[channelId].connectedSince as string).toLocaleDateString() : "N/A"}
+Messages Today:    ${metrics?.channelMetrics[channelId]?.messagesToday.toLocaleString() || "0"}
+All-Time Messages: ${metrics?.channelMetrics[channelId]?.totalMessages.toLocaleString() || "0"}
 
 =========================================
 Generated by OPSConnect Analytics
@@ -476,7 +450,7 @@ ${date.toISOString().split("T")[0]}
   };
 
   const handleExportCSV = (channelId: string) => {
-    const data = monthlyReportData[channelId];
+    const data = metrics?.monthlyReport[channelId];
     const channel = partnerChannels.find((c) => c.id === channelId);
     if (!data || !channel) return;
 
@@ -484,12 +458,9 @@ ${date.toISOString().split("T")[0]}
       "Metric,Value",
       `Channel,${channel.name}`,
       `Total Messages,${data.totalMessages}`,
-      `Resolved,${data.resolved}`,
-      `Resolution Rate,${((data.resolved / data.totalMessages) * 100).toFixed(2)}%`,
-      `Avg Response Time (min),${data.avgResponseMin}`,
-      `CSAT Score,${data.csat}%`,
-      `Peak Hours,${data.peakHours}`,
-      `Top Customer,${data.topCustomer}`,
+      `vs Last Month,${data.vsLastMonthPct == null ? "N/A" : data.vsLastMonthPct.toFixed(1) + "%"}`,
+      `Peak Hour,${data.peakHour}`,
+      `Top Contact,${data.topContact}`,
     ];
     const csvContent = csvRows.join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -551,23 +522,6 @@ ${date.toISOString().split("T")[0]}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <button
-                  onClick={handleBulkTestAll}
-                  disabled={bulkTest.running || connectedArray.length === 0}
-                  className={`text-sm font-semibold whitespace-nowrap cursor-pointer px-5 py-2.5 rounded-md transition-colors ${
-                    bulkTest.running
-                      ? "bg-accent-100 text-accent-600"
-                      : connectedArray.length === 0
-                        ? "bg-background-200/70 text-foreground-300 cursor-not-allowed"
-                        : "bg-accent-500 text-background-50 dark:text-foreground-950 hover:bg-accent-600"
-                  }`}
-                >
-                  {bulkTest.running ? (
-                    <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 border-2 border-accent-500 border-t-transparent rounded-full animate-spin"/> Testing All...</span>
-                  ) : (
-                    <span className="flex items-center gap-1"><i className="ri-flashlight-line"></i> Bulk Test All</span>
-                  )}
-                </button>
                 <Link
                   to="/partners#connect"
                   className="text-sm font-semibold bg-primary-500 text-background-50 dark:text-foreground-950 hover:bg-primary-600 transition-colors whitespace-nowrap cursor-pointer px-5 py-2.5 rounded-md inline-flex items-center gap-1.5"
@@ -595,35 +549,32 @@ ${date.toISOString().split("T")[0]}
               </div>
             )}
 
-            {/* Bulk Test Progress */}
-            {bulkTest.running && (
-              <div className="bg-background-100 rounded-xl border border-background-200/70 p-5 mb-8">
-                <h3 className="text-sm font-semibold text-foreground-900 mb-4">Bulk Test Progress</h3>
-                <div className="space-y-2">
-                  {bulkTest.entries.map((entry) => {
-                    const channel = partnerChannels.find((c) => c.id === entry.channelId);
-                    return (
-                      <div key={entry.channelId} className="flex items-center gap-3 bg-background-50 rounded-lg px-4 py-2.5">
-                        <div className="w-7 h-7 flex items-center justify-center rounded-md" style={{ backgroundColor: (channel?.color || "#999") + "20" }}>
-                          <i className={`${channel?.icon || "ri-question-line"} text-xs`} style={{ color: channel?.color || "#999" }}></i>
-                        </div>
-                        <span className="flex-1 text-xs font-medium text-foreground-800">{channel?.name || entry.channelId}</span>
-                        <div className="flex items-center gap-2">
-                          {entry.status === "idle" && <span className="text-xs text-foreground-400">Waiting...</span>}
-                          {entry.status === "testing" && <span className="flex items-center gap-1.5 text-xs text-foreground-500"><span className="w-3 h-3 border-2 border-primary-500 border-t-transparent rounded-full animate-spin"/> Testing</span>}
-                          {entry.status === "success" && <span className="flex items-center gap-1 text-xs text-accent-600"><i className="ri-checkbox-circle-line"></i> Passed</span>}
-                          {entry.status === "error" && <span className="flex items-center gap-1 text-xs text-red-500"><i className="ri-close-circle-line"></i> Failed</span>}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
             {/* Stats Row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-              {dashboardStats.map((stat) => (
+              {(metricsLoading ? [] : [
+                {
+                  label: "Connected Channels", icon: "ri-link",
+                  value: String(connectedArray.length),
+                  trend: `${disconnectedArray.length} available`,
+                },
+                {
+                  label: "Messages Today", icon: "ri-message-3-line",
+                  value: (metrics?.messagesToday ?? 0).toLocaleString(),
+                  trend: metrics && metrics.messagesYesterday > 0
+                    ? `${metrics.messagesToday >= metrics.messagesYesterday ? "+" : ""}${(((metrics.messagesToday - metrics.messagesYesterday) / metrics.messagesYesterday) * 100).toFixed(0)}% vs yesterday`
+                    : "vs yesterday",
+                },
+                {
+                  label: "Active Conversations", icon: "ri-chat-3-line",
+                  value: String(metrics?.activeConversations ?? 0),
+                  trend: `${metrics?.waitingConversations ?? 0} awaiting reply`,
+                },
+                {
+                  label: "Support Resolution Rate", icon: "ri-thumb-up-line",
+                  value: metrics && metrics.totalRequests > 0 ? `${((metrics.resolvedRequests / metrics.totalRequests) * 100).toFixed(1)}%` : "—",
+                  trend: metrics ? `${metrics.resolvedRequests}/${metrics.totalRequests} resolved` : "No requests yet",
+                },
+              ]).map((stat) => (
                 <div key={stat.label} className="bg-background-100 rounded-xl border border-background-200/70 p-5">
                   <div className="flex items-center justify-between mb-3">
                     <div className="w-9 h-9 flex items-center justify-center rounded-lg bg-primary-100">
@@ -634,6 +585,9 @@ ${date.toISOString().split("T")[0]}
                   <div className="font-heading text-xl md:text-2xl font-bold text-foreground-950">{stat.value}</div>
                   <div className="text-xs text-foreground-500 mt-0.5">{stat.label}</div>
                 </div>
+              ))}
+              {metricsLoading && [0, 1, 2, 3].map((i) => (
+                <div key={i} className="bg-background-100 rounded-xl border border-background-200/70 p-5 h-[92px] animate-pulse" />
               ))}
             </div>
 
@@ -666,8 +620,7 @@ ${date.toISOString().split("T")[0]}
                   ) : (
                     <div className="space-y-3">
                       {connectedArray.map((channel) => {
-                        const metrics = channelMetrics[channel.id];
-                        const testState = testStates[channel.id];
+                        const chMetrics = metrics?.channelMetrics[channel.id];
                         return (
                           <div key={channel.id} className="bg-background-100 rounded-xl border border-accent-200/60 p-5">
                             <div className="flex items-start justify-between">
@@ -680,45 +633,26 @@ ${date.toISOString().split("T")[0]}
                                     <h3 className="font-heading text-sm font-semibold text-foreground-900">{channel.name}</h3>
                                     <span className="w-2 h-2 rounded-full bg-accent-500" />
                                   </div>
-                                  <p className="text-xs text-foreground-500 mt-0.5">Connected since {metrics?.connectedSince || "recently"}</p>
+                                  <p className="text-xs text-foreground-500 mt-0.5">
+                                    Connected since {chMetrics?.connectedSince ? new Date(chMetrics.connectedSince).toLocaleDateString() : "recently"}
+                                  </p>
                                 </div>
                               </div>
                               <div className="flex items-center gap-1.5">
-                                <button
-                                  onClick={() => handleTestConnection(channel.id)}
-                                  disabled={!!testState}
-                                  className={`text-xs font-medium whitespace-nowrap cursor-pointer px-3 py-1.5 rounded-md transition-colors ${
-                                    testState === "success"
-                                      ? "bg-accent-100 text-accent-600"
-                                      : "bg-secondary-100 text-secondary-700 hover:bg-secondary-200"
-                                  }`}
-                                >
-                                  {testState === "testing" ? (
-                                    <span className="flex items-center gap-1.5"><span className="w-3 h-3 border-2 border-secondary-500 border-t-transparent rounded-full animate-spin" /> Testing</span>
-                                  ) : testState === "success" ? (
-                                    <span className="flex items-center gap-1"><i className="ri-check-line"></i> Passed</span>
-                                  ) : (
-                                    <span className="flex items-center gap-1"><i className="ri-send-plane-line text-[10px]"></i> Test</span>
-                                  )}
-                                </button>
                                 <button onClick={() => setDisconnectModal(channel.id)} className="text-xs font-medium whitespace-nowrap cursor-pointer px-3 py-1.5 rounded-md text-foreground-500 hover:text-red-500 hover:bg-red-50 transition-colors">
                                   Disconnect
                                 </button>
                               </div>
                             </div>
-                            {metrics && (
-                              <div className="mt-4 grid grid-cols-3 gap-3">
+                            {chMetrics && (
+                              <div className="mt-4 grid grid-cols-2 gap-3">
                                 <div className="bg-background-50 rounded-lg p-3">
                                   <p className="text-[10px] text-foreground-400 uppercase tracking-wider mb-0.5">Today</p>
-                                  <p className="text-sm font-bold text-foreground-900">{metrics.messagesToday.toLocaleString()}</p>
+                                  <p className="text-sm font-bold text-foreground-900">{chMetrics.messagesToday.toLocaleString()}</p>
                                 </div>
                                 <div className="bg-background-50 rounded-lg p-3">
                                   <p className="text-[10px] text-foreground-400 uppercase tracking-wider mb-0.5">Total</p>
-                                  <p className="text-sm font-bold text-foreground-900">{metrics.totalMessages.toLocaleString()}</p>
-                                </div>
-                                <div className="bg-background-50 rounded-lg p-3">
-                                  <p className="text-[10px] text-foreground-400 uppercase tracking-wider mb-0.5">Avg Reply</p>
-                                  <p className="text-sm font-bold text-foreground-900">{metrics.avgResponseTime}</p>
+                                  <p className="text-sm font-bold text-foreground-900">{chMetrics.totalMessages.toLocaleString()}</p>
                                 </div>
                               </div>
                             )}
@@ -756,26 +690,28 @@ ${date.toISOString().split("T")[0]}
                       {/* Bar chart */}
                       <div className="relative">
                         <div className="flex items-end gap-2 md:gap-3 h-[200px] md:h-[240px] mb-3">
-                          {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => {
-                            const totalValue = connectedArray.reduce((sum, ch) => {
-                              const trend = analyticsTrends[ch.id];
-                              if (!trend) return sum;
-                              const entry = trend.find((d) => d.day === day);
+                          {(() => {
+                            const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+                            const dayTotal = (day: string) => connectedArray.reduce((sum, ch) => {
+                              const trend = metrics?.weeklyTrends[ch.id];
+                              const entry = trend?.find((d) => d.day === day);
                               return sum + (entry?.value || 0);
                             }, 0);
-                            const maxTotal = 500;
+                            const maxTotal = Math.max(1, ...days.map(dayTotal));
+                            return days.map((day) => {
+                            const totalValue = dayTotal(day);
                             return (
                               <div key={day} className="flex-1 flex flex-col items-center gap-1.5">
                                 <span className="text-[10px] font-medium text-foreground-500">{totalValue}</span>
                                 <div className="w-full relative h-[180px] md:h-[210px] flex flex-col justify-end">
                                   {/* Stacked bars for each connected channel */}
                                   {connectedArray.map((ch, idx) => {
-                                    const trend = analyticsTrends[ch.id];
+                                    const trend = metrics?.weeklyTrends[ch.id];
                                     const entry = trend?.find((d) => d.day === day);
                                     const chValue = entry?.value || 0;
-                                    const chHeightPct = Math.max(1, (chValue / maxTotal) * 100);
+                                    const chHeightPct = Math.max(chValue > 0 ? 2 : 0, (chValue / maxTotal) * 100);
                                     const totalBelow = connectedArray.slice(0, idx).reduce((sum, c) => {
-                                      const t = analyticsTrends[c.id];
+                                      const t = metrics?.weeklyTrends[c.id];
                                       const e = t?.find((d) => d.day === day);
                                       return sum + (e?.value || 0);
                                     }, 0);
@@ -797,7 +733,8 @@ ${date.toISOString().split("T")[0]}
                                 <span className="text-[10px] text-foreground-400">{day}</span>
                               </div>
                             );
-                          })}
+                            });
+                          })()}
                         </div>
                       </div>
 
@@ -857,7 +794,7 @@ ${date.toISOString().split("T")[0]}
                         <p className="text-xs text-foreground-500 mb-5">Download or view aggregated monthly summaries per channel. Data refreshed every 24 hours.</p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           {connectedArray.map((channel) => {
-                            const data = monthlyReportData[channel.id];
+                            const data = metrics?.monthlyReport[channel.id];
                             if (!data) return null;
                             return (
                               <div key={channel.id} className="bg-background-50 rounded-lg border border-background-200/70 p-4">
@@ -873,20 +810,18 @@ ${date.toISOString().split("T")[0]}
 
                                 <div className="grid grid-cols-2 gap-2 mb-3">
                                   <div className="bg-background-100 rounded p-2">
-                                    <p className="text-[10px] text-foreground-400">Resolution</p>
-                                    <p className="text-xs font-bold text-foreground-800">{((data.resolved / data.totalMessages) * 100).toFixed(1)}%</p>
+                                    <p className="text-[10px] text-foreground-400">vs Last Month</p>
+                                    <p className="text-xs font-bold text-foreground-800">
+                                      {data.vsLastMonthPct == null ? "—" : `${data.vsLastMonthPct >= 0 ? "+" : ""}${data.vsLastMonthPct.toFixed(1)}%`}
+                                    </p>
                                   </div>
                                   <div className="bg-background-100 rounded p-2">
-                                    <p className="text-[10px] text-foreground-400">Avg Reply</p>
-                                    <p className="text-xs font-bold text-foreground-800">{data.avgResponseMin} min</p>
+                                    <p className="text-[10px] text-foreground-400">Peak Hour</p>
+                                    <p className="text-xs font-bold text-foreground-800 truncate">{data.peakHour}</p>
                                   </div>
-                                  <div className="bg-background-100 rounded p-2">
-                                    <p className="text-[10px] text-foreground-400">CSAT</p>
-                                    <p className="text-xs font-bold text-foreground-800">{data.csat}%</p>
-                                  </div>
-                                  <div className="bg-background-100 rounded p-2">
-                                    <p className="text-[10px] text-foreground-400">Peak</p>
-                                    <p className="text-xs font-bold text-foreground-800 truncate">{data.peakHours.split(" ")[0]}</p>
+                                  <div className="bg-background-100 rounded p-2 col-span-2">
+                                    <p className="text-[10px] text-foreground-400">Top Contact</p>
+                                    <p className="text-xs font-bold text-foreground-800 truncate">{data.topContact}</p>
                                   </div>
                                 </div>
 
@@ -1363,23 +1298,58 @@ ${date.toISOString().split("T")[0]}
                 {/* Live Chat — real-time agent replies to widget visitors */}
                 <LiveChat partnerId={partnerIdState} />
 
+                {/* Live Chat Performance — response time, resolution, CSAT */}
+                {metrics?.liveChatPerf && (
+                  <div className="bg-background-100 rounded-xl border border-background-200/70 p-5">
+                    <h2 className="font-heading text-sm font-bold text-foreground-950 mb-4">Live Chat Performance</h2>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-background-50 rounded-lg p-3">
+                        <p className="text-[10px] text-foreground-400 uppercase tracking-wider mb-0.5">Total Chats</p>
+                        <p className="text-sm font-bold text-foreground-900">{metrics.liveChatPerf.totalChats}</p>
+                      </div>
+                      <div className="bg-background-50 rounded-lg p-3">
+                        <p className="text-[10px] text-foreground-400 uppercase tracking-wider mb-0.5">Closed</p>
+                        <p className="text-sm font-bold text-foreground-900">
+                          {metrics.liveChatPerf.totalChats > 0 ? `${((metrics.liveChatPerf.closedChats / metrics.liveChatPerf.totalChats) * 100).toFixed(0)}%` : "—"}
+                        </p>
+                      </div>
+                      <div className="bg-background-50 rounded-lg p-3">
+                        <p className="text-[10px] text-foreground-400 uppercase tracking-wider mb-0.5">Avg Response</p>
+                        <p className="text-sm font-bold text-foreground-900">
+                          {metrics.liveChatPerf.avgResponseMin == null ? "—" : `${metrics.liveChatPerf.avgResponseMin.toFixed(1)} min`}
+                        </p>
+                      </div>
+                      <div className="bg-background-50 rounded-lg p-3">
+                        <p className="text-[10px] text-foreground-400 uppercase tracking-wider mb-0.5">CSAT</p>
+                        <p className="text-sm font-bold text-foreground-900">
+                          {metrics.liveChatPerf.avgRating == null ? "No ratings yet" : `${metrics.liveChatPerf.avgRating.toFixed(1)} / 5`}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Recent Activity */}
                 <div className="bg-background-100 rounded-xl border border-background-200/70 p-5">
                   <h2 className="font-heading text-sm font-bold text-foreground-950 mb-4">Recent Activity</h2>
-                  <div className="space-y-3">
-                    {recentActivity.map((activity, idx) => (
-                      <div key={idx} className="flex gap-3 items-start">
-                        <div className="w-8 h-8 flex items-center justify-center rounded-full flex-shrink-0 mt-0.5" style={{ backgroundColor: (channelColors[activity.channel] || "#999") + "20" }}>
-                          <i className={`${channelIcons[activity.channel] || "ri-question-line"} text-xs`} style={{ color: channelColors[activity.channel] || "#999" }}></i>
+                  {!metrics || metrics.recentActivity.length === 0 ? (
+                    <p className="text-xs text-foreground-400">No messages yet.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {metrics.recentActivity.map((activity, idx) => (
+                        <div key={idx} className="flex gap-3 items-start">
+                          <div className="w-8 h-8 flex items-center justify-center rounded-full flex-shrink-0 mt-0.5" style={{ backgroundColor: (channelColors[activity.channel] || "#999") + "20" }}>
+                            <i className={`${channelIcons[activity.channel] || "ri-question-line"} text-xs`} style={{ color: channelColors[activity.channel] || "#999" }}></i>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium text-foreground-800 truncate">{activity.event}</p>
+                            <p className="text-[11px] text-foreground-400 truncate">{activity.customer}</p>
+                            <p className="text-[10px] text-foreground-300">{timeAgo(activity.created_at)}</p>
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-medium text-foreground-800 truncate">{activity.event}</p>
-                          <p className="text-[11px] text-foreground-400">{activity.customer}</p>
-                          <p className="text-[10px] text-foreground-300">{activity.time}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Quick Tips */}

@@ -38,7 +38,7 @@ const routes: RouteObject[] = [
     element: <AuthGuard><Partners /></AuthGuard>,
   },
   {
-    path: "/admin",
+    path: "/panel-d0b65d43",
     element: <AuthGuard require="admin"><AdminDashboard /></AuthGuard>,
   },
   {

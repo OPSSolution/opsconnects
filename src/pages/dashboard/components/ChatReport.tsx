@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/utils/supabase/client";
+import { downloadCSV, fmtDateTime } from "@/utils/csv";
 
 const PAGE_SIZE = 20;
 
@@ -205,15 +206,13 @@ export default function ChatReport({ partnerId, partnerTextId }: Props) {
   const [periods, setPeriods]     = useState<PeriodEntry[]>([]);
   const [tlLoading, setTlLoading] = useState(false);
 
-  // seed / demo
-  const [seeding, setSeeding]     = useState(false);
-  const [seedMsg, setSeedMsg]     = useState<string | null>(null);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
 
   // widget chats tab
   const [wgSessions, setWgSessions]           = useState<WidgetSession[]>([]);
   const [wgLoading, setWgLoading]             = useState(false);
   const [wgSearch, setWgSearch]               = useState("");
+  const [wgStatusFilter, setWgStatusFilter]   = useState<"all" | "waiting" | "active" | "closed">("all");
   const [selSession, setSelSession]           = useState<WidgetSession | null>(null);
   const [wgThread, setWgThread]               = useState<WidgetMsg[]>([]);
   const [wgThreadLoading, setWgThreadLoading] = useState(false);
@@ -356,34 +355,6 @@ export default function ChatReport({ partnerId, partnerTextId }: Props) {
   const toggleCh = (id: string) => { setChFilter((p) => p.includes(id) ? p.filter((c) => c !== id) : [...p, id]); setPage(0); };
   const doSearch = () => { setSearchVal(searchInput); setPage(0); };
 
-  const seedDemoData = async () => {
-    if (!partnerId) return;
-    setSeeding(true);
-    setSeedMsg(null);
-    try {
-      const supabaseUrl = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
-      const res = await fetch(`${supabaseUrl}/functions/v1/seed-demo-messages`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string}`,
-        },
-        body: JSON.stringify({ partner_id: partnerId }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Seed failed");
-      setSeedMsg(`${json.inserted} demo messages loaded!`);
-      // refresh all data
-      fetchSummaries();
-      if (view === "messages") fetchMsgs();
-      if (view === "clients") fetchClients();
-      if (view === "timeline") fetchTimeline();
-    } catch (err) {
-      setSeedMsg(`Error: ${(err as Error).message}`);
-    }
-    setSeeding(false);
-  };
-
   const copyWebhookUrl = (url: string) => {
     navigator.clipboard.writeText(url).catch(() => {});
     setCopiedUrl(url);
@@ -440,17 +411,6 @@ export default function ChatReport({ partnerId, partnerTextId }: Props) {
                   <i className={tab.icon} />{tab.label}
                 </button>
               ))}
-            </div>
-            {/* Demo data loader */}
-            <div className="flex items-center gap-2">
-              {seedMsg && (
-                <span className={`text-[11px] font-medium ${seedMsg.startsWith("Error") ? "text-red-500" : "text-accent-600"}`}>{seedMsg}</span>
-              )}
-              <button onClick={seedDemoData} disabled={seeding || !partnerId}
-                className="flex items-center gap-1.5 text-xs font-medium bg-background-50 border border-background-200/70 text-foreground-600 hover:text-foreground-900 hover:bg-background-100 transition-colors whitespace-nowrap cursor-pointer px-3 py-1.5 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">
-                {seeding ? <span className="w-3 h-3 border-2 border-foreground-400 border-t-transparent rounded-full animate-spin" /> : <i className="ri-test-tube-line" />}
-                {seeding ? "Loading…" : "Load Demo Data"}
-              </button>
             </div>
           </div>
 
@@ -785,8 +745,16 @@ export default function ChatReport({ partnerId, partnerTextId }: Props) {
             ) : (
               /* session list */
               <>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 flex items-center gap-2 bg-background-50 border border-background-200/70 rounded-lg px-3 py-1.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex gap-1 bg-background-50 border border-background-200/70 rounded-lg p-0.5">
+                    {(["all", "waiting", "active", "closed"] as const).map((s) => (
+                      <button key={s} onClick={() => setWgStatusFilter(s)}
+                        className={`text-xs font-semibold whitespace-nowrap cursor-pointer px-3 py-1.5 rounded-md transition-colors capitalize ${wgStatusFilter === s ? "bg-primary-500 text-background-50 dark:text-foreground-950" : "text-foreground-600 hover:bg-background-100"}`}>
+                        {s === "all" ? "All" : s}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex-1 flex items-center gap-2 bg-background-50 border border-background-200/70 rounded-lg px-3 py-1.5 min-w-[180px]">
                     <i className="ri-search-line text-xs text-foreground-400 flex-shrink-0" />
                     <input type="text" value={wgSearch} onChange={(e) => setWgSearch(e.target.value)}
                       placeholder="Search by visitor name or contact…"
@@ -797,13 +765,25 @@ export default function ChatReport({ partnerId, partnerTextId }: Props) {
 
                 {(() => {
                   const filtered = wgSessions.filter((s) =>
-                    !wgSearch ||
-                    s.visitor_name.toLowerCase().includes(wgSearch.toLowerCase()) ||
-                    s.visitor_contact.toLowerCase().includes(wgSearch.toLowerCase())
+                    (wgStatusFilter === "all" || s.status === wgStatusFilter) &&
+                    (!wgSearch ||
+                      s.visitor_name.toLowerCase().includes(wgSearch.toLowerCase()) ||
+                      s.visitor_contact.toLowerCase().includes(wgSearch.toLowerCase()))
+                  );
+                  const exportSessions = () => downloadCSV(
+                    `widget-chats-${new Date().toISOString().slice(0, 10)}.csv`,
+                    ["Date/Time", "Visitor Name", "Contact", "Status", "Initial Message"],
+                    filtered.map((s) => [fmtDateTime(s.created_at), s.visitor_name, s.visitor_contact, s.status, s.initial_message])
                   );
                   return (
                     <>
-                      <p className="text-xs text-foreground-500">{wgLoading ? "Loading…" : `${filtered.length} session${filtered.length !== 1 ? "s" : ""}`}</p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs text-foreground-500">{wgLoading ? "Loading…" : `${filtered.length} session${filtered.length !== 1 ? "s" : ""}`}</p>
+                        <button onClick={exportSessions} disabled={!filtered.length}
+                          className="text-xs font-medium bg-background-50 border border-background-200/70 text-foreground-600 hover:text-foreground-900 hover:bg-background-100 transition-colors whitespace-nowrap cursor-pointer px-3 py-1.5 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1">
+                          <i className="ri-download-2-line" /> Export CSV
+                        </button>
+                      </div>
                       {wgLoading ? <Spinner /> : filtered.length === 0 ? (
                         <div className="text-center py-12">
                           <div className="w-12 h-12 mx-auto flex items-center justify-center rounded-full bg-background-200/80 mb-4">
@@ -879,7 +859,7 @@ export default function ChatReport({ partnerId, partnerTextId }: Props) {
                   </div>
                   <div className="bg-foreground-950 rounded-lg p-4 font-mono text-[11px] text-accent-300 leading-relaxed space-y-1 overflow-x-auto">
                     <p className="text-foreground-400 select-none"># deploy all 6 webhook handlers</p>
-                    {["webhook-whatsapp","webhook-telegram","webhook-messenger","webhook-instagram","webhook-line","webhook-wechat","seed-demo-messages"].map((fn) => (
+                    {["webhook-whatsapp","webhook-telegram","webhook-messenger","webhook-instagram","webhook-line","webhook-wechat"].map((fn) => (
                       <p key={fn}>supabase functions deploy {fn}</p>
                     ))}
                   </div>

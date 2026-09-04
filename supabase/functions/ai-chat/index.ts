@@ -68,11 +68,11 @@ Deno.serve(async (req: Request) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   const { data: partner } = await supabase
     .from("partners")
-    .select("name, ai_business_context")
+    .select("partner_name, ai_business_context")
     .eq("partner_id", partnerId)
     .maybeSingle();
 
-  const businessName = (partner?.name as string | null) ?? "this business";
+  const businessName = (partner?.partner_name as string | null) ?? "this business";
   const context      = (partner?.ai_business_context as string | null) ?? "";
 
   const forcedLang = lang && LANG_NAMES_MAP[lang] ? LANG_NAMES_MAP[lang] : null;
